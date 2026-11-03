@@ -1,4 +1,5 @@
 """Declared game-version compatibility checks; no runtime assumptions."""
+# Version checks intentionally never infer undocumented runtime APIs.
 import json
 import re
 from pathlib import Path

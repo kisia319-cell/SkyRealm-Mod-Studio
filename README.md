@@ -16,7 +16,7 @@ Windows desktop editor for SkyRealm mod projects.
 
 Open **Все инструменты** in a project to access:
 
-- **Smart static analyzer:** flags selected risky patterns, unfinished TODO/FIXME markers and malformed JSON/Python. Findings are heuristics and require review; user code is never executed.\n- **Strict project validation:** checks manifest field types, ID/version formats, safe entry paths, duplicate mod IDs, missing dependencies and declared conflicts. Missing dependencies are warnings because they may be supplied externally.
+- **Smart static analyzer:** detects selected risky JavaScript patterns while ignoring strings and ordinary comments; reports TODO/FIXME in comments and malformed JSON/Python. Findings are heuristics and require review; user code is never executed.\n- **Strict project validation:** checks manifest field types, ID/version formats, safe entry paths, duplicate mod IDs, missing dependencies and declared conflicts. Missing dependencies are warnings because they may be supplied externally.\n- **Strict project validation:** checks manifest field types, ID/version formats, safe entry paths, duplicate mod IDs, missing dependencies and declared conflicts. Missing dependencies are warnings because they may be supplied externally.
 - **Data designers:** create and validate JSON files for items, weapons, mobs, quests, animations and biomes under `data/`.
 - **Local mod manager:** discovers subprojects in `mods/*/mod.json` and stores Studio-side enable flags in `.studio-mods.json`. These flags do not load or unload mods in the game.
 - **ZIP packager:** validates basic `mod.json` fields and packages source files while excluding caches, dependencies and backups.

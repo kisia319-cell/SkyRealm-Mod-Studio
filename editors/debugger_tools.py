@@ -38,9 +38,14 @@ class InspectorWorker(QThread):
         self.commands = queue.Queue()
         self.stopping = threading.Event()
         self._next_id = 1
+        self.current_call_frame_id = None
+        self._scope_requests = {}
 
     def command(self, method, params=None):
         self.commands.put({"method": method, "params": params or {}})
+
+    def evaluate(self, expression):
+        self.commands.put({"method": "__evaluate_watch", "params": {"expression": expression}})
 
     def stop(self):
         self.stopping.set()
@@ -48,15 +53,18 @@ class InspectorWorker(QThread):
     def run(self):
         try:
             import websocket
-            socket = websocket.create_connection(self.websocket_url, timeout=0.25, suppress_origin=True)
+            socket = websocket.create_connection(self.websocket_url, timeout=5, suppress_origin=True)
+            socket.settimeout(0.25)
         except Exception as exc:
             self.output.emit(f"Не удалось подключиться к Node Inspector: {exc}")
             return
         self.output.emit("Node Inspector подключён.")
         try:
             def send(method, params=None):
-                socket.send(json.dumps({"id": self._next_id, "method": method, "params": params or {}}))
+                command_id = self._next_id
+                socket.send(json.dumps({"id": command_id, "method": method, "params": params or {}}))
                 self._next_id += 1
+                return command_id
 
             send("Runtime.enable")
             send("Debugger.enable")
@@ -70,7 +78,17 @@ class InspectorWorker(QThread):
                 try:
                     while True:
                         command = self.commands.get_nowait()
-                        send(command["method"], command.get("params"))
+                        if command["method"] == "__evaluate_watch":
+                            if self.current_call_frame_id:
+                                send("Debugger.evaluateOnCallFrame", {
+                                    "callFrameId": self.current_call_frame_id,
+                                    "expression": command["params"].get("expression", ""),
+                                    "returnByValue": True
+                                })
+                            else:
+                                self.output.emit("Сначала останови выполнение на точке останова.")
+                        else:
+                            send(command["method"], command.get("params"))
                 except queue.Empty:
                     pass
                 try:
@@ -93,14 +111,26 @@ class InspectorWorker(QThread):
                     frames = params.get("callFrames") or []
                     if frames:
                         frame = frames[0]
+                        self.current_call_frame_id = frame.get("callFrameId")
                         location = frame.get("location", {})
                         line = location.get("lineNumber", 0) + 1
                         function = frame.get("functionName") or "(анонимная функция)"
-                        scopes = ", ".join(scope.get("type", "scope") for scope in frame.get("scopeChain", []))
-                        self.output.emit(f"⏸ Пауза: {function}, строка {line}. Области видимости: {scopes or 'нет данных'}.")
+                        scopes = frame.get("scopeChain", [])
+                        scope_names = ", ".join(scope.get("type", "scope") for scope in scopes)
+                        self.output.emit(f"⏸ Пауза: {function}, строка {line}. Области видимости: {scope_names or 'нет данных'}.")
+                        for scope in scopes[:8]:
+                            object_id = (scope.get("object") or {}).get("objectId")
+                            if object_id:
+                                request_id = send("Runtime.getProperties", {
+                                    "objectId": object_id,
+                                    "ownProperties": True,
+                                    "generatePreview": True
+                                })
+                                self._scope_requests[request_id] = scope.get("type", "scope")
                     else:
                         self.output.emit(f"⏸ Выполнение приостановлено: {params.get('reason', 'breakpoint')}")
                 elif method == "Debugger.resumed":
+                    self.current_call_frame_id = None
                     self.output.emit("▶ Выполнение продолжено.")
                 elif method == "Runtime.consoleAPICalled":
                     args = params.get("args", [])
@@ -113,8 +143,22 @@ class InspectorWorker(QThread):
                     self.output.emit("[Inspector] " + str(message["error"].get("message", "ошибка протокола")))
                 elif message.get("id") and "result" in message:
                     result = message["result"]
+                    request_id = message["id"]
                     if "breakpointId" in result:
                         self.output.emit("[точка останова] установлена: " + str(result.get("breakpointId")))
+                    if request_id in self._scope_requests:
+                        scope_name = self._scope_requests.pop(request_id)
+                        properties = result.get("result", [])
+                        values = []
+                        for prop in properties[:30]:
+                            value = prop.get("value") or {}
+                            rendered = value.get("value", value.get("description", value.get("type", "undefined")))
+                            values.append(f"{prop.get('name')} = {rendered}")
+                        if values:
+                            self.output.emit(f"[переменные {scope_name}] " + "; ".join(values))
+                    elif result.get("result") and isinstance(result.get("result"), dict):
+                        value = result["result"]
+                        self.output.emit("[выражение] " + str(value.get("value", value.get("description", value.get("type", "undefined")))))
         finally:
             try:
                 socket.close()
@@ -182,6 +226,14 @@ class NodeDebuggerWidget(QWidget):
         for button in (self.run_button, self.continue_button, self.over_button, self.into_button, self.out_button, self.stop_button, self.profile_button):
             controls.addWidget(button)
         root.addLayout(controls)
+        watch_row = QHBoxLayout()
+        self.watch_expression = QLineEdit()
+        self.watch_expression.setPlaceholderText("Выражение для вычисления на паузе, например player.health")
+        evaluate = QPushButton("Вычислить")
+        evaluate.clicked.connect(self._evaluate_watch)
+        watch_row.addWidget(self.watch_expression, 1)
+        watch_row.addWidget(evaluate)
+        root.addLayout(watch_row)
         self.output = QPlainTextEdit()
         self.output.setReadOnly(True)
         self.output.setMaximumBlockCount(5000)
@@ -275,6 +327,15 @@ class NodeDebuggerWidget(QWidget):
     def _send(self, method):
         if self.worker and self.worker.isRunning():
             self.worker.command(method)
+        else:
+            self._append("Отладчик ещё не подключён.")
+
+    def _evaluate_watch(self):
+        expression = self.watch_expression.text().strip()
+        if not expression:
+            return
+        if self.worker and self.worker.isRunning():
+            self.worker.evaluate(expression)
         else:
             self._append("Отладчик ещё не подключён.")
 

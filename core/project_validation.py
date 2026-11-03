@@ -53,14 +53,28 @@ def validate_manifest(folder: Path):
             elif resolved.suffix.lower() not in {".js", ".mjs", ".cjs"}:
                 warnings.append("Главный файл не JavaScript. Проверь, поддерживает ли его игровой runtime.")
 
+    normalized = {}
     for field in ("dependencies", "conflicts"):
         value = data.get(field)
         if value is not None and not isinstance(value, (dict, list)):
             errors.append(f"Поле '{field}' должно быть объектом или массивом.")
-        elif isinstance(value, list) and any(not isinstance(item, str) or not item.strip() for item in value):
-            errors.append(f"Все элементы '{field}' должны быть непустыми строками.")
-        elif isinstance(value, dict) and any(not isinstance(k, str) or not k.strip() for k in value):
-            errors.append(f"Ключи '{field}' должны быть непустыми строками.")
+            normalized[field] = set()
+            continue
+        ids = list(value.keys()) if isinstance(value, dict) else list(value or [])
+        if any(not isinstance(item, str) or not _ID_RE.fullmatch(item.strip()) for item in ids):
+            errors.append(f"Все ID в поле '{field}' должны соответствовать формату ID мода.")
+        if len(ids) != len(set(item for item in ids if isinstance(item, str))):
+            warnings.append(f"Поле '{field}' содержит повторяющиеся ID.")
+        normalized[field] = {item.strip() for item in ids if isinstance(item, str) and item.strip()}
+        if isinstance(value, dict):
+            for key, constraint in value.items():
+                if constraint is not None and not isinstance(constraint, str):
+                    errors.append(f"Ограничение версии для '{key}' в поле '{field}' должно быть строкой.")
+    if data.get("id") in normalized.get("dependencies", set()):
+        errors.append("Мод не может зависеть сам от себя.")
+    overlap = normalized.get("dependencies", set()) & normalized.get("conflicts", set())
+    if overlap:
+        errors.append("Один ID не может одновременно быть зависимостью и конфликтом: " + ", ".join(sorted(overlap)))
 
     return data, errors, warnings
 
@@ -74,8 +88,14 @@ def validate_project(folder: Path):
 
     mods_root = root / "mods"
     installed = {}
+    if mods_root.is_symlink():
+        warnings.append("Папка mods/ является символической ссылкой и не проверялась.")
+        return errors, warnings
     if mods_root.is_dir():
         for manifest in sorted(mods_root.glob("*/mod.json")):
+            if manifest.is_symlink() or manifest.parent.is_symlink():
+                warnings.append(f"{manifest.parent.name}: символическая ссылка пропущена.")
+                continue
             try:
                 child = json.loads(manifest.read_text(encoding="utf-8"))
             except (OSError, UnicodeError, json.JSONDecodeError):

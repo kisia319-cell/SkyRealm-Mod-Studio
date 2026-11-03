@@ -17,6 +17,7 @@ from core.smart_analysis import scan_javascript
 from core.project_validation import validate_manifest, validate_project
 from core.compatibility import check_compatibility
 from core.mod_manager import discover_mods, resolve_load_order, export_load_order
+from core.archive_builder import create_project_archive
 from editors.data_designer import VisualDataDesigner
 from editors.debugger_tools import NodeDebuggerWidget
 
@@ -439,46 +440,20 @@ class AdvancedToolsDialog(QDialog):
         if not self._validate_package():
             QMessageBox.warning(self, "Проверка не пройдена", "Исправь ошибки перед сборкой.")
             return
-        destination, _ = QFileDialog.getSaveFileName(self, "Собрать мод", str(self.folder.parent / (self.folder.name + ".zip")), "ZIP (*.zip)")
+        destination, _ = QFileDialog.getSaveFileName(
+            self, "Собрать мод", str(self.folder.parent / (self.folder.name + ".zip")), "ZIP (*.zip)"
+        )
         if not destination:
             return
-        target = Path(destination).resolve()
-        temp_name = None
         try:
-            fd, temp_name = tempfile.mkstemp(prefix=".skyrealm-mod-", suffix=".zip", dir=str(target.parent))
-            os.close(fd)
-            count = 0
-            with zipfile.ZipFile(temp_name, "w", zipfile.ZIP_DEFLATED) as archive:
-                for root, dirs, files in os.walk(self.folder, followlinks=False):
-                    root_path = Path(root)
-                    dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS and not (root_path / d).is_symlink()]
-                    for name in files:
-                        path = root_path / name
-                        if path.is_symlink() or path.resolve() == target or name == ".studio-mods.json":
-                            continue
-                        try:
-                            path.resolve().relative_to(self.folder)
-                        except ValueError:
-                            continue
-                        archive.write(path, path.relative_to(self.folder))
-                        count += 1
-            with zipfile.ZipFile(temp_name, "r") as archive:
-                damaged = archive.testzip()
-                if damaged:
-                    raise zipfile.BadZipFile(f"Контроль ZIP не пройдена: {damaged}")
-            os.replace(temp_name, target)
-            temp_name = None
-            self.package_report.appendPlainText(f"\nСоздан архив: {target}\nФайлов: {count}\nКонтроль целостности ZIP: пройдена")
+            target, count = create_project_archive(self.folder, destination)
+            self.package_report.appendPlainText(
+                f"\nСоздан архив: {target}\nФайлов: {count}\nКонтроль целостности ZIP: пройдена"
+            )
             QMessageBox.information(self, "Сборка завершена", f"ZIP создан:\n{target}\n\nАрхив исходников. Проверь его в игре перед публикацией.")
             logging.info("Packaged project into %s (%s files)", target, count)
-        except (OSError, zipfile.BadZipFile) as exc:
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
             QMessageBox.critical(self, "Ошибка сборки", str(exc))
-        finally:
-            if temp_name and os.path.exists(temp_name):
-                try:
-                    os.unlink(temp_name)
-                except OSError:
-                    pass
 
     def _build_git(self):
         page = QWidget()

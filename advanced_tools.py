@@ -19,6 +19,7 @@ from core.compatibility import check_compatibility
 from core.mod_manager import discover_mods, resolve_load_order, export_load_order
 from core.archive_builder import create_project_archive
 from editors.data_designer import VisualDataDesigner
+from editors.sprite_editor import SpriteEditorDialog
 from editors.debugger_tools import NodeDebuggerWidget
 
 from PySide6.QtCore import Qt, QProcess, QProcessEnvironment
@@ -172,8 +173,11 @@ class AdvancedToolsDialog(QDialog):
         refresh.clicked.connect(self._refresh_assets)
         open_file = QPushButton("Открыть ресурс")
         open_file.clicked.connect(self._open_selected_asset)
+        sprite_editor = QPushButton("Редактор спрайтов")
+        sprite_editor.clicked.connect(self._open_sprite_editor)
         row.addWidget(add)
         row.addWidget(refresh)
+        row.addWidget(sprite_editor)
         row.addStretch()
         row.addWidget(open_file)
         layout.addLayout(row)
@@ -253,6 +257,16 @@ class AdvancedToolsDialog(QDialog):
         QMessageBox.information(self, "Импорт ресурсов", report)
         logging.info("Imported %s project assets", copied)
 
+    def _open_sprite_editor(self):
+        item = self.asset_list.currentItem()
+        image_path = Path(item.data(Qt.ItemDataRole.UserRole)) if item else None
+        if image_path and image_path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}:
+            image_path = None
+        try:
+            SpriteEditorDialog(self.folder, image_path, self).exec()
+            self._refresh_assets()
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Редактор спрайтов", str(exc))
     def _open_selected_asset(self):
         item = self.asset_list.currentItem()
         if item:

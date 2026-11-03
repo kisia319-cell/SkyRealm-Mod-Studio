@@ -83,7 +83,7 @@ def validate_project(folder: Path):
     """Validate the manifest and relationships between mods in mods/."""
     root = Path(folder).resolve()
     data, errors, warnings = validate_manifest(root)
-    if not data:
+    if errors or not data:
         return errors, warnings
 
     mods_root = root / "mods"

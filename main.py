@@ -470,10 +470,13 @@ class ProjectWindow(QMainWindow):
         self.tree.addTopLevelItem(root_item)
         ignored = {".git", "__pycache__", ".venv", "venv", ".backups", ".history", "build", "dist", "node_modules"}
         paths = []
-        for current_root, dirs, files in os.walk(self.folder):
-            dirs[:] = sorted(d for d in dirs if d not in ignored)
+        for current_root, dirs, files in os.walk(self.folder, followlinks=False):
+            current_path = Path(current_root)
+            dirs[:] = sorted(d for d in dirs if d not in ignored and not (current_path / d).is_symlink())
             for filename in files:
-                candidate = Path(current_root) / filename
+                candidate = current_path / filename
+                if candidate.is_symlink():
+                    continue
                 if candidate.suffix.lower() in {".js", ".mjs", ".json", ".py", ".md", ".txt"}:
                     paths.append(candidate)
         for path in sorted(paths, key=lambda p: str(p).casefold()):
@@ -499,7 +502,7 @@ class ProjectWindow(QMainWindow):
         if not value:
             return
         path = Path(value)
-        if not path.is_file():
+        if path.is_symlink() or not path.is_file():
             return
         if self.dirty and not self.confirm_discard_or_save():
             return

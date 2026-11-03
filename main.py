@@ -465,25 +465,30 @@ class ProjectWindow(QMainWindow):
         root_item = QTreeWidgetItem([self.folder.name])
         root_item.setData(0, Qt.ItemDataRole.UserRole, str(self.folder))
         self.tree.addTopLevelItem(root_item)
-        for path in sorted(self.folder.rglob("*")):
-            if any(part in {".git", "__pycache__", ".venv", "venv", ".backups", ".history"} for part in path.parts):
-                continue
-            if path.is_file() and path.suffix.lower() in {".js", ".mjs", ".json", ".py", ".md", ".txt"}:
-                relative = path.relative_to(self.folder)
-                parent = root_item
-                for part in relative.parts[:-1]:
-                    found = None
-                    for i in range(parent.childCount()):
-                        if parent.child(i).text(0) == part:
-                            found = parent.child(i)
-                            break
-                    if found is None:
-                        found = QTreeWidgetItem([part])
-                        parent.addChild(found)
-                    parent = found
-                item = QTreeWidgetItem([relative.name])
-                item.setData(0, Qt.ItemDataRole.UserRole, str(path))
-                parent.addChild(item)
+        ignored = {".git", "__pycache__", ".venv", "venv", ".backups", ".history", "build", "dist", "node_modules"}
+        paths = []
+        for current_root, dirs, files in os.walk(self.folder):
+            dirs[:] = sorted(d for d in dirs if d not in ignored)
+            for filename in files:
+                candidate = Path(current_root) / filename
+                if candidate.suffix.lower() in {".js", ".mjs", ".json", ".py", ".md", ".txt"}:
+                    paths.append(candidate)
+        for path in sorted(paths, key=lambda p: str(p).casefold()):
+            relative = path.relative_to(self.folder)
+            parent = root_item
+            for part in relative.parts[:-1]:
+                found = None
+                for i in range(parent.childCount()):
+                    if parent.child(i).text(0) == part:
+                        found = parent.child(i)
+                        break
+                if found is None:
+                    found = QTreeWidgetItem([part])
+                    parent.addChild(found)
+                parent = found
+            item = QTreeWidgetItem([relative.name])
+            item.setData(0, Qt.ItemDataRole.UserRole, str(path))
+            parent.addChild(item)
         root_item.setExpanded(True)
 
     def open_tree_item(self, item, _column=0):

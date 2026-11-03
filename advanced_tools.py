@@ -189,7 +189,11 @@ class AdvancedToolsDialog(QDialog):
             self.asset_details.clear()
             return
         for path in sorted(root.rglob("*"), key=lambda item: str(item).casefold()):
-            if not path.is_file() or any(part in EXCLUDED_DIRS for part in path.parts):
+            if not path.is_file() or path.is_symlink() or any(part in EXCLUDED_DIRS for part in path.parts):
+                continue
+            try:
+                path.resolve().relative_to(root.resolve())
+            except ValueError:
                 continue
             if path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".wav", ".mp3", ".ogg", ".flac", ".ttf", ".otf"}:
                 continue

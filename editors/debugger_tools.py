@@ -188,6 +188,7 @@ class NodeDebuggerWidget(QWidget):
         self.profiler_process.errorOccurred.connect(self._process_error)
         self.worker = None
         self._debug_paused = False
+        self._debug_stderr_buffer = ""
         self._inspector_url_seen = False
         self._processing_profile = False
         self._profile_started_at = 0.0
@@ -306,6 +307,7 @@ class NodeDebuggerWidget(QWidget):
             QMessageBox.warning(self, "Точки останова", str(exc))
             return
         self._inspector_url_seen = False
+        self._debug_stderr_buffer = ""
         self._append(f"Запуск отладчика: {path.relative_to(self.folder)}")
         self.debug_process.start("node", ["--inspect-brk=127.0.0.1:0", str(path)])
 
@@ -313,10 +315,15 @@ class NodeDebuggerWidget(QWidget):
         text = bytes(self.debug_process.readAllStandardError()).decode("utf-8", "replace")
         if text:
             self._append(text.rstrip())
+            self._debug_stderr_buffer = (self._debug_stderr_buffer + text)[-2048:]
         if self.worker is None:
-            match = re.search(r"(ws://127\.0\.0\.1:\d+/[A-Za-z0-9_-]+)", text)
+            match = re.search(r"(ws://127\.0\.0\.1:\d+/[A-Za-z0-9_-]+)", self._debug_stderr_buffer)
             if match:
                 path = self._selected_file()
+                if path is None:
+                    self._append("Выбранный файл больше недоступен внутри проекта.")
+                    self.debug_process.kill()
+                    return
                 try:
                     lines = parse_breakpoints(self.breakpoints.text())
                 except ValueError:

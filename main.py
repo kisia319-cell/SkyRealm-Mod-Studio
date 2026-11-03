@@ -94,11 +94,12 @@ class _ProjectCheckTask(QRunnable):
             manifest_errors, manifest_warnings = validate_project(self.folder)
             problems.extend(f"ERROR: {message}" for message in manifest_errors)
             problems.extend(f"WARNING: {message}" for message in manifest_warnings)
-            for root, dirs, files in os.walk(self.folder):
-                dirs[:] = [d for d in dirs if d not in self.EXCLUDED]
+            for root, dirs, files in os.walk(self.folder, followlinks=False):
+                root_path = Path(root)
+                dirs[:] = [d for d in dirs if d not in self.EXCLUDED and not (root_path / d).is_symlink()]
                 for filename in files:
-                    code_path = Path(root) / filename
-                    if code_path.suffix.lower() not in self.extensions:
+                    code_path = root_path / filename
+                    if code_path.is_symlink() or code_path.suffix.lower() not in self.extensions:
                         continue
                     try:
                         source = code_path.read_text(encoding="utf-8")

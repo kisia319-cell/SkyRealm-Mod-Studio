@@ -213,7 +213,10 @@ class NodeDebuggerWidget(QWidget):
         self.profile_button.setEnabled(bool(checked and idle and self.file_combo.count()))
         for button in (self.continue_button, self.over_button, self.into_button, self.out_button):
             button.setEnabled(self.worker is not None and self.worker.isRunning())
-        self.stop_button.setEnabled(self.debug_process.state() != QProcess.ProcessState.NotRunning)
+        self.stop_button.setEnabled(
+            self.debug_process.state() != QProcess.ProcessState.NotRunning
+            or self.profiler_process.state() != QProcess.ProcessState.NotRunning
+        )
 
     def _selected_file(self):
         value = self.file_combo.currentData()
@@ -281,10 +284,18 @@ class NodeDebuggerWidget(QWidget):
         if self.debug_process.state() != QProcess.ProcessState.NotRunning:
             self.debug_process.kill()
             self.debug_process.waitForFinished(1500)
+        if self.profiler_process.state() != QProcess.ProcessState.NotRunning:
+            self.profiler_process.kill()
+            self.profiler_process.waitForFinished(1500)
         if self.worker:
             self.worker.wait(1500)
             self.worker = None
+        self._processing_profile = False
+        self._profile_log_path = None
         self._update_enabled(self.confirm.isChecked())
+
+    def stop_all(self):
+        self.stop_debugger()
 
     def start_profiler(self):
         if not self.confirm.isChecked():

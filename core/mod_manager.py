@@ -21,6 +21,8 @@ def discover_mods(project: Path, state=None):
     mods_root = root / "mods"
     mods = {}
     errors, warnings = [], []
+    if mods_root.is_symlink():
+        return mods, errors, ["Папка mods/ является символической ссылкой; каталог модов не сканировался."]
     if not mods_root.is_dir():
         return mods, errors, warnings
     for manifest in sorted(mods_root.glob("*/mod.json"), key=lambda p: str(p).casefold()):

@@ -29,6 +29,21 @@ class ModManagerTests(unittest.TestCase):
             result = json.loads(export_load_order(root, mods, order).read_text(encoding="utf-8"))
             self.assertEqual([item["id"] for item in result["mods"]], order)
 
+    def test_large_dependency_chain_is_iterative(self):
+        mods = {}
+        for index in range(1300):
+            mod_id = f"mod.{index}"
+            mods[mod_id] = {
+                "enabled": True,
+                "dependencies": [f"mod.{index - 1}"] if index else [],
+                "conflicts": [],
+            }
+        order, errors, _ = resolve_load_order(mods)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(order), 1300)
+        self.assertEqual(order[0], "mod.0")
+        self.assertEqual(order[-1], "mod.1299")
+
     def test_disabled_dependency_and_cycle_conflict(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

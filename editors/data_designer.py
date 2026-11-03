@@ -218,8 +218,11 @@ class VisualDataDesigner(QWidget):
                     control.setText(str(value))
             if self.kind.currentText() == "Анимация":
                 self.frames.setRowCount(0)
-                for frame in data.get("frames", []):
-                    self._insert_frame(frame)
+                frame_data = data.get("frames", [])
+                if isinstance(frame_data, list):
+                    for frame in frame_data:
+                        if isinstance(frame, dict):
+                            self._insert_frame(frame)
             self._loading = False
         except (ValueError, TypeError, json.JSONDecodeError):
             self._loading = False
@@ -229,6 +232,8 @@ class VisualDataDesigner(QWidget):
             self._sync_raw()
 
     def _insert_frame(self, frame=None):
+        if not isinstance(frame, dict):
+            frame = {}
         frame = frame or {"sprite": "", "durationMs": 100, "x": 0, "y": 0, "scale": 1, "opacity": 1}
         row = self.frames.rowCount()
         self.frames.insertRow(row)

@@ -56,6 +56,7 @@ jobs:
           python tests/test_mod_manager.py
           python tests/test_archive_builder.py
           python tests/test_sprite_editor.py
+          python tests/test_publisher.py
       - name: Build standalone executable
         run: pyinstaller --noconfirm --clean --onefile --windowed --name SkyRealmModStudio main.py
       - name: Upload build artifact

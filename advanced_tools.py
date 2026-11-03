@@ -11,6 +11,7 @@ import subprocess
 import sys
 import zipfile
 from pathlib import Path
+from core.smart_analysis import scan_javascript
 
 from PySide6.QtCore import Qt, QProcess, QProcessEnvironment
 from PySide6.QtGui import QFont
@@ -108,20 +109,8 @@ class AdvancedToolsDialog(QDialog):
                 checked += 1
                 rel = path.relative_to(self.folder)
                 if path.suffix.lower() in {".js", ".mjs", ".cjs"}:
-                    patterns = [
-                        (r"\beval\s*\(", "опасный eval(): избегай выполнения строк как кода"),
-                        (r"\bnew\s+Function\s*\(", "динамическое создание функций затрудняет проверку"),
-                        (r"\bwhile\s*\(\s*true\s*\)", "возможен бесконечный цикл"),
-                        (r"\bsetInterval\s*\(", "проверь, что таймер очищается и не создаёт утечки"),
-                        (r"\bconsole\.log\s*\(", "отладочный console.log может засорять вывод"),
-                        (r"\bTODO\b|\bFIXME\b", "осталась незавершённая задача"),
-                    ]
-                    for number, line in enumerate(source.splitlines(), 1):
-                        for pattern, message in patterns:
-                            if re.search(pattern, line):
-                                findings.append(f"WARN {rel}:{number}: {message}")
-                    if re.search(r"\b(?:spawnMob|createItem|registerWeapon|addQuest)\s*\(", source):
-                        findings.append(f"INFO {rel}: обнаружены игровые вызовы; сверь их с API runtime своей версии SkyRealm.")
+                    for number, message, level in scan_javascript(source):
+                        findings.append(f"{level} {rel}:{number}: {message}")
                 elif path.suffix.lower() == ".json":
                     try:
                         json.loads(source)

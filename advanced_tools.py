@@ -8,11 +8,14 @@ import logging
 import os
 import re
 import subprocess
+import tempfile
 import shutil
 import sys
 import zipfile
 from pathlib import Path
 from core.smart_analysis import scan_javascript
+from core.project_validation import validate_manifest, validate_project
+from core.compatibility import check_compatibility
 from editors.data_designer import VisualDataDesigner
 
 from PySide6.QtCore import Qt, QProcess, QProcessEnvironment
@@ -272,7 +275,9 @@ class AdvancedToolsDialog(QDialog):
         state_path = self.folder / ".studio-mods.json"
         try:
             state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
-        except (OSError, json.JSONDecodeError):
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            state = {}
+        if not isinstance(state, dict):
             state = {}
         if not root.is_dir():
             self.mod_list.addItem("Папка mods/ пока отсутствует.")
@@ -280,13 +285,17 @@ class AdvancedToolsDialog(QDialog):
         for manifest in sorted(root.glob("*/mod.json")):
             try:
                 meta = json.loads(manifest.read_text(encoding="utf-8"))
-                mod_id = str(meta.get("id") or manifest.parent.name)
-                item = QListWidgetItem(f"{meta.get('name', manifest.parent.name)}  —  {meta.get('version', '?')}  [{mod_id}]")
+                if not isinstance(meta, dict):
+                    raise ValueError("manifest должен быть JSON-объектом")
+                mod_id = meta.get("id") if isinstance(meta.get("id"), str) else manifest.parent.name
+                mod_name = meta.get("name") if isinstance(meta.get("name"), str) else manifest.parent.name
+                version = meta.get("version") if isinstance(meta.get("version"), str) else "?"
+                item = QListWidgetItem(f"{mod_name}  —  {version}  [{mod_id}]")
                 item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                 item.setCheckState(Qt.CheckState.Checked if state.get(mod_id, True) else Qt.CheckState.Unchecked)
                 item.setData(Qt.ItemDataRole.UserRole, mod_id)
                 self.mod_list.addItem(item)
-            except (OSError, json.JSONDecodeError):
+            except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
                 self.mod_list.addItem(f"Повреждён manifest: {manifest}")
 
     def _save_mod_states(self, _item=None):
@@ -304,7 +313,16 @@ class AdvancedToolsDialog(QDialog):
     def _build_package(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.addWidget(QLabel("Сборщик проверяет manifest и упаковывает исходники без кэша, истории и резервных копий. ZIP не является подписанным установщиком."))
+        layout.addWidget(QLabel("Проверка проекта, объявленных ограничений версии игры и сборка ZIP-архива исходников."))
+        compatibility = QHBoxLayout()
+        compatibility.addWidget(QLabel("Версия SkyRealm:"))
+        self.game_version = QLineEdit()
+        self.game_version.setPlaceholderText("например, 0.20.37")
+        compatibility.addWidget(self.game_version, 1)
+        check_compat = QPushButton("Проверить совместимость")
+        check_compat.clicked.connect(self._check_game_compatibility)
+        compatibility.addWidget(check_compat)
+        layout.addLayout(compatibility)
         self.package_report = QPlainTextEdit()
         self.package_report.setReadOnly(True)
         layout.addWidget(self.package_report, 1)
@@ -319,26 +337,33 @@ class AdvancedToolsDialog(QDialog):
         layout.addLayout(row)
         return page
 
+    def _check_game_compatibility(self):
+        errors, warnings, info = check_compatibility(self.folder, self.game_version.text().strip())
+        lines = ["Проверка заявленной совместимости:"]
+        lines.extend("ERROR: " + value for value in errors)
+        lines.extend("WARNING: " + value for value in warnings)
+        lines.extend("INFO: " + value for value in info)
+        if not errors and not warnings:
+            lines.append("Заявленные ограничения версии не противоречат выбранной версии игры.")
+        lines.append("Примечание: проверяются только поля manifest; фактические игровые API и runtime не запускаются.")
+        self.package_report.setPlainText("\\n".join(lines))
+        logging.info("Compatibility check completed for game %s", self.game_version.text().strip())
+
     def _validate_package(self):
-        errors = []
-        manifest = self.folder / "mod.json"
-        try:
-            data = json.loads(manifest.read_text(encoding="utf-8"))
-            if not isinstance(data, dict):
-                errors.append("mod.json должен содержать объект.")
-            else:
-                for key in ("id", "name", "version", "entry"):
-                    if not data.get(key):
-                        errors.append(f"В mod.json отсутствует {key}.")
-                if data.get("entry"):
-                    entry = (self.folder / data["entry"]).resolve()
-                    if self.folder not in entry.parents:
-                        errors.append("entry выходит за пределы папки проекта.")
-                    elif not entry.is_file():
-                        errors.append(f"Главный файл не найден: {data['entry']}")
-        except (OSError, json.JSONDecodeError) as exc:
-            errors.append(f"Не удалось прочитать mod.json: {exc}")
-        self.package_report.setPlainText("Проверка упаковки:\n" + ("\n".join(errors) if errors else "Базовые проверки пройдены. Совместимость с игрой не подтверждена."))
+        data, errors, warnings = validate_manifest(self.folder)
+        project_errors, project_warnings = validate_project(self.folder)
+        errors.extend(project_errors)
+        warnings.extend(project_warnings)
+        # Keep report order deterministic and avoid repeating the same message.
+        errors = list(dict.fromkeys(errors))
+        warnings = list(dict.fromkeys(warnings))
+        lines = ["Проверка упаковки:"]
+        lines.extend("ERROR: " + value for value in errors)
+        lines.extend("WARNING: " + value for value in warnings)
+        if not errors and not warnings:
+            lines.append("Ошибок и предупреждений не обнаружено.")
+        lines.append("Совместимость с игровым runtime не подтверждена.")
+        self.package_report.setPlainText("\\n".join(lines))
         return not errors
 
     def _build_zip(self):
@@ -349,22 +374,42 @@ class AdvancedToolsDialog(QDialog):
         if not destination:
             return
         target = Path(destination).resolve()
+        temp_name = None
         try:
+            fd, temp_name = tempfile.mkstemp(prefix=".skyrealm-mod-", suffix=".zip", dir=str(target.parent))
+            os.close(fd)
             count = 0
-            with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
-                for root, dirs, files in os.walk(self.folder):
-                    dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
+            with zipfile.ZipFile(temp_name, "w", zipfile.ZIP_DEFLATED) as archive:
+                for root, dirs, files in os.walk(self.folder, followlinks=False):
+                    root_path = Path(root)
+                    dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS and not (root_path / d).is_symlink()]
                     for name in files:
-                        path = Path(root) / name
-                        if path.resolve() == target or name == ".studio-mods.json":
+                        path = root_path / name
+                        if path.is_symlink() or path.resolve() == target or name == ".studio-mods.json":
+                            continue
+                        try:
+                            path.resolve().relative_to(self.folder)
+                        except ValueError:
                             continue
                         archive.write(path, path.relative_to(self.folder))
                         count += 1
-            self.package_report.appendPlainText(f"\nСоздан архив: {target}\nФайлов: {count}")
-            QMessageBox.information(self, "Сборка завершена", f"ZIP создан:\n{target}\n\nЭто архив исходников. Проверь его в игре перед публикацией.")
+            with zipfile.ZipFile(temp_name, "r") as archive:
+                damaged = archive.testzip()
+                if damaged:
+                    raise zipfile.BadZipFile(f"Контроль ZIP не пройдена: {damaged}")
+            os.replace(temp_name, target)
+            temp_name = None
+            self.package_report.appendPlainText(f"\\nСоздан архив: {target}\\nФайлов: {count}\\nКонтроль целостности ZIP: пройдена")
+            QMessageBox.information(self, "Сборка завершена", f"ZIP создан:\\n{target}\\n\\nАрхив исходников. Проверь его в игре перед публикацией.")
             logging.info("Packaged project into %s (%s files)", target, count)
         except (OSError, zipfile.BadZipFile) as exc:
             QMessageBox.critical(self, "Ошибка сборки", str(exc))
+        finally:
+            if temp_name and os.path.exists(temp_name):
+                try:
+                    os.unlink(temp_name)
+                except OSError:
+                    pass
 
     def _build_git(self):
         page = QWidget()

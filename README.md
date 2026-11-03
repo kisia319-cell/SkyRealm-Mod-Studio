@@ -12,11 +12,11 @@ Windows desktop editor for SkyRealm mod projects.
 - Learning course, limited SkyRealm API catalog and educational starter templates.
 - GitHub Releases update check and portable EXE update flow.
 
-## Advanced tools (1.4.0)
+## Advanced tools (1.5.0)
 
 Open **Все инструменты** in a project to access:
 
-- **Smart static analyzer:** flags selected risky patterns, unfinished TODO/FIXME markers and malformed JSON/Python. Findings are heuristics and require review; user code is never executed.
+- **Smart static analyzer:** flags selected risky patterns, unfinished TODO/FIXME markers and malformed JSON/Python. Findings are heuristics and require review; user code is never executed.\n- **Strict project validation:** checks manifest field types, ID/version formats, safe entry paths, duplicate mod IDs, missing dependencies and declared conflicts. Missing dependencies are warnings because they may be supplied externally.
 - **Data designers:** create and validate JSON files for items, weapons, mobs, quests, animations and biomes under `data/`.
 - **Local mod manager:** discovers subprojects in `mods/*/mod.json` and stores Studio-side enable flags in `.studio-mods.json`. These flags do not load or unload mods in the game.
 - **ZIP packager:** validates basic `mod.json` fields and packages source files while excluding caches, dependencies and backups.

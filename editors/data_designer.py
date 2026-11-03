@@ -1,5 +1,6 @@
 """Visual data designer for mod metadata and animation frames."""
 import json
+import math
 import os
 import tempfile
 from pathlib import Path
@@ -98,12 +99,18 @@ class VisualDataDesigner(QWidget):
         remove_frame = QPushButton("Удалить выбранный")
         play = QPushButton("▶ Просмотр")
         stop = QPushButton("■ Стоп")
+        move_up = QPushButton("↑")
+        move_down = QPushButton("↓")
         add_frame.clicked.connect(self.add_frame)
         remove_frame.clicked.connect(self.remove_frame)
         play.clicked.connect(self.start_animation_preview)
         stop.clicked.connect(self.stop_animation_preview)
+        move_up.clicked.connect(lambda: self.move_frame(-1))
+        move_down.clicked.connect(lambda: self.move_frame(1))
         frame_buttons.addWidget(add_frame)
         frame_buttons.addWidget(remove_frame)
+        frame_buttons.addWidget(move_up)
+        frame_buttons.addWidget(move_down)
         frame_buttons.addWidget(play)
         frame_buttons.addWidget(stop)
         frame_buttons.addStretch()
@@ -265,6 +272,8 @@ class VisualDataDesigner(QWidget):
                 raise ValueError(f"Неверное число в строке кадра {row + 1}.") from exc
             if frame["durationMs"] < 1:
                 raise ValueError(f"Длительность кадра {row + 1} должна быть больше нуля.")
+            if not all(math.isfinite(frame[key]) for key in ("x", "y", "scale", "opacity")):
+                raise ValueError(f"Все числовые значения кадра {row + 1} должны быть конечными числами.")
             if not 0 <= frame["opacity"] <= 1 or frame["scale"] <= 0:
                 raise ValueError(f"Масштаб должен быть > 0, прозрачность — от 0 до 1 (кадр {row + 1}).")
             frames.append(frame)
@@ -417,6 +426,24 @@ class VisualDataDesigner(QWidget):
                   frame.get("y", 0), frame.get("scale", 1), frame.get("opacity", 1)]
         for col, value in enumerate(values):
             self.frames.setItem(row, col, QTableWidgetItem(str(value)))
+
+    def move_frame(self, direction):
+        row = self.frames.currentRow()
+        target = row + direction
+        if row < 0 or target < 0 or target >= self.frames.rowCount():
+            return
+        values = [
+            self.frames.item(row, column).text() if self.frames.item(row, column) else ""
+            for column in range(self.frames.columnCount())
+        ]
+        self._loading = True
+        self.frames.removeRow(row)
+        self.frames.insertRow(target)
+        for column, value in enumerate(values):
+            self.frames.setItem(target, column, QTableWidgetItem(value))
+        self.frames.setCurrentCell(target, 0)
+        self._loading = False
+        self._sync_raw()
 
     def start_animation_preview(self):
         if not self.frames.rowCount():

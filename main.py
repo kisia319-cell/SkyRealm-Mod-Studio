@@ -126,6 +126,9 @@ class ProjectWindow(QMainWindow):
         export_btn = QPushButton("Экспорт ZIP")
         export_btn.clicked.connect(self.export_project)
         header.addWidget(export_btn)
+        metadata_btn = QPushButton("Настройки мода")
+        metadata_btn.clicked.connect(self.edit_metadata)
+        header.addWidget(metadata_btn)
         root.addLayout(header)
 
         split = QSplitter()
@@ -297,6 +300,51 @@ class ProjectWindow(QMainWindow):
         cursor.setPosition(block.position() + max(0, col - 1))
         self.editor.setTextCursor(cursor)
         self.editor.setFocus()
+
+    def edit_metadata(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Настройки проекта")
+        dialog.setMinimumWidth(520)
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+        name_field = QLineEdit(str(self.metadata.get("name", "")))
+        version_field = QLineEdit(str(self.metadata.get("version", "1.0.0")))
+        author_field = QLineEdit(str(self.metadata.get("author", "")))
+        description_field = QPlainTextEdit(str(self.metadata.get("description", "")))
+        description_field.setMaximumHeight(130)
+        form.addRow("Название:", name_field)
+        form.addRow("Версия:", version_field)
+        form.addRow("Автор:", author_field)
+        form.addRow("Описание:", description_field)
+        layout.addLayout(form)
+        buttons = QHBoxLayout()
+        cancel = QPushButton("Отмена")
+        save = QPushButton("Сохранить")
+        save.setObjectName("primary")
+        cancel.clicked.connect(dialog.reject)
+        save.clicked.connect(dialog.accept)
+        buttons.addStretch()
+        buttons.addWidget(cancel)
+        buttons.addWidget(save)
+        layout.addLayout(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        if not name_field.text().strip():
+            QMessageBox.warning(self, "Название", "Название проекта не может быть пустым.")
+            return
+        self.metadata.update({
+            "name": name_field.text().strip(),
+            "version": version_field.text().strip() or "1.0.0",
+            "author": author_field.text().strip(),
+            "description": description_field.toPlainText().strip(),
+        })
+        try:
+            (self.folder / "mod.json").write_text(
+                json.dumps(self.metadata, ensure_ascii=False, indent=4), encoding="utf-8")
+            self.setWindowTitle(f"SkyRealm Mod Studio — {self.metadata['name']}")
+            self.status.setText("Настройки проекта сохранены")
+        except OSError as exc:
+            QMessageBox.critical(self, "Ошибка сохранения", str(exc))
 
     def format_current_file(self):
         if self.current_file is None:

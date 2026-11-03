@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QTabWidget, QLabel,
     QLineEdit, QComboBox, QPlainTextEdit, QPushButton, QSpinBox,
@@ -13,12 +14,12 @@ from PySide6.QtWidgets import (
 )
 
 DATA_TYPES = {
-    "Предмет": ("items", {"id": "my_mod:example_item", "name": "Новый предмет", "description": "", "stackSize": 10, "rarity": "common"}),
-    "Оружие": ("weapons", {"id": "my_mod:example_weapon", "name": "Новое оружие", "damage": 25, "attackCooldown": 0.7, "rarity": "common"}),
-    "Монстр": ("mobs", {"id": "my_mod:example_mob", "name": "Новый монстр", "health": 100, "damage": 10, "speed": 2, "abilities": []}),
+    "Предмет": ("items", {"id": "my_mod:example_item", "name": "Новый предмет", "description": "", "stackSize": 10, "rarity": "common", "sprite": "assets/sprites/example.png"}),
+    "Оружие": ("weapons", {"id": "my_mod:example_weapon", "name": "Новое оружие", "damage": 25, "attackCooldown": 0.7, "rarity": "common", "sprite": "assets/sprites/example.png"}),
+    "Монстр": ("mobs", {"id": "my_mod:example_mob", "name": "Новый монстр", "health": 100, "damage": 10, "speed": 2, "abilities": [], "sprite": "assets/sprites/example.png"}),
     "Квест": ("quests", {"id": "my_mod:example_quest", "title": "Новый квест", "description": "", "objectives": [], "rewards": []}),
     "Анимация": ("animations", {"id": "my_mod:example_animation", "target": "player", "fps": 12, "loop": False, "frames": []}),
-    "Биом": ("biomes", {"id": "my_mod:example_biome", "name": "Новый биом", "temperature": 0.5, "terrain": "default", "spawns": []}),
+    "Биом": ("biomes", {"id": "my_mod:example_biome", "name": "Новый биом", "temperature": 0.5, "terrain": "default", "spawns": [], "sprite": "assets/sprites/example.png"}),
     "Диалог NPC": ("dialogs", {"id": "my_mod:example_dialog", "title": "Диалог NPC", "npc": "villager", "nodes": [{"id": "start", "text": "Привет!", "options": []}]}),
     "Игровое событие": ("events", {"id": "my_mod:example_event", "name": "Новое событие", "trigger": "on_day_start", "conditions": [], "actions": []}),
 }
@@ -71,9 +72,17 @@ class VisualDataDesigner(QWidget):
         list_buttons.addStretch()
         list_layout.addLayout(list_buttons)
         self.tabs.addTab(self.list_page, "Квесты / диалоги / события")
+        preview_panel = QWidget()
+        preview_layout = QHBoxLayout(preview_panel)
+        self.preview_image = QLabel("Спрайт не выбран")
+        self.preview_image.setFixedSize(100, 100)
+        self.preview_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_image.setStyleSheet("background:#101a30;border:1px solid #263552;border-radius:8px")
         self.preview = QLabel("Предпросмотр данных")
         self.preview.setWordWrap(True)
         self.preview.setObjectName("muted")
+        preview_layout.addWidget(self.preview_image)
+        preview_layout.addWidget(self.preview, 1)
         self.animation_page = QWidget()
         anim_layout = QVBoxLayout(self.animation_page)
         anim_layout.addWidget(QLabel("Кадры анимации: спрайт/имя кадра, длительность и координаты"))
@@ -92,7 +101,7 @@ class VisualDataDesigner(QWidget):
         anim_layout.addLayout(frame_buttons)
         self.tabs.addTab(self.animation_page, "Кадры анимации")
         root.addWidget(self.tabs, 1)
-        root.addWidget(self.preview)
+        root.addWidget(preview_panel)
         bottom = QHBoxLayout()
         load = QPushButton("Сбросить к шаблону")
         validate = QPushButton("Проверить")
@@ -328,7 +337,26 @@ class VisualDataDesigner(QWidget):
         if not hasattr(self, "preview"):
             return
         label = data.get("name") or data.get("title") or "(без названия)"
-        self.preview.setText(f"{self.kind.currentText()} • {label} • ID: {data.get('id', '—')} • Полей: {len(data)}")
+        details = [f"{self.kind.currentText()} • {label}", f"ID: {data.get('id', '—')}"]
+        for key, value in data.items():
+            if key in {"id", "name", "title", "sprite", "frames"} or isinstance(value, (dict, list)):
+                continue
+            details.append(f"{key}: {value}")
+        self.preview.setText("\\n".join(details[:7]))
+        self.preview_image.setPixmap(QPixmap())
+        sprite = data.get("sprite")
+        if isinstance(sprite, str) and sprite.strip():
+            candidate = (self.folder / sprite).resolve()
+            try:
+                candidate.relative_to(self.folder)
+                pixmap = QPixmap(str(candidate))
+                if not pixmap.isNull():
+                    self.preview_image.setPixmap(pixmap.scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+                    self.preview_image.setText("")
+                else:
+                    self.preview_image.setText("Нет спрайта")
+            except (ValueError, OSError):
+                self.preview_image.setText("Путь вне проекта")
 
 
     def _insert_frame(self, frame=None):

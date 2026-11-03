@@ -119,6 +119,14 @@ class VisualDataDesigner(QWidget):
             else:
                 control = QLineEdit(str(value))
             self._controls[key] = control
+            if isinstance(control, QCheckBox):
+                control.toggled.connect(self._sync_raw)
+            elif isinstance(control, (QSpinBox, QDoubleSpinBox)):
+                control.valueChanged.connect(self._sync_raw)
+            elif isinstance(control, QPlainTextEdit):
+                control.textChanged.connect(self._sync_raw)
+            elif isinstance(control, QLineEdit):
+                control.textChanged.connect(self._sync_raw)
             self.form_layout.addRow(key, control)
         self.filename.setText(template["id"].split(":")[-1] + ".json")
         self.frames.setRowCount(0)
@@ -244,8 +252,9 @@ class VisualDataDesigner(QWidget):
                 raise ValueError("Корень JSON должен быть объектом.")
             if not isinstance(data.get("id"), str) or not data["id"].strip():
                 raise ValueError("Поле id должно быть непустой строкой.")
-            if not isinstance(data.get("name") or data.get("title"), str):
-                raise ValueError("Нужно текстовое поле name или title.")
+            label = data.get("name") or data.get("title")
+            if not isinstance(label, str) or not label.strip():
+                raise ValueError("Нужно непустое текстовое поле name или title.")
             if self.kind.currentText() == "Анимация":
                 self._read_frames()
             QMessageBox.information(self, "Проверка", "JSON корректен, основные поля проверены. Поддержка игровым runtime не подтверждена.")

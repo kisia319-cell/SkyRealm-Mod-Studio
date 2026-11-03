@@ -1,4 +1,5 @@
 import json
+import hashlib
 import os
 import re
 import subprocess
@@ -44,7 +45,15 @@ class UpdateWorker(QThread):
             if not asset or not asset.get("browser_download_url"):
                 self.finished_check.emit(None, "В релизе нет SkyRealmModStudio.exe.")
                 return
-            self.finished_check.emit({"version": tag, "url": asset["browser_download_url"]}, "")
+            digest = asset.get("digest") or ""
+            if digest and not re.fullmatch(r"sha256:[0-9a-fA-F]{64}", digest):
+                self.finished_check.emit(None, "GitHub вернул некорректную контрольную сумму обновления.")
+                return
+            self.finished_check.emit({
+                "version": tag,
+                "url": asset["browser_download_url"],
+                "sha256": digest.split(":", 1)[1].lower() if digest else None,
+            }, "")
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
                 self.finished_check.emit(None, "NO_RELEASE")
@@ -57,9 +66,10 @@ class UpdateWorker(QThread):
 class DownloadWorker(QThread):
     finished_download = Signal(str, str)
 
-    def __init__(self, url, parent=None):
+    def __init__(self, url, parent=None, expected_sha256=None):
         super().__init__(parent)
         self.url = url
+        self.expected_sha256 = expected_sha256
 
     def run(self):
         destination = Path(tempfile.gettempdir()) / "SkyRealmModStudio-update.exe"
@@ -80,6 +90,13 @@ class DownloadWorker(QThread):
             with destination.open("rb") as file:
                 if file.read(2) != b"MZ":
                     raise ValueError("GitHub вернул файл, который не является Windows EXE.")
+            if self.expected_sha256:
+                digest = hashlib.sha256()
+                with destination.open("rb") as file:
+                    for chunk in iter(lambda: file.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                if digest.hexdigest().lower() != self.expected_sha256.lower():
+                    raise ValueError("Контрольная сумма обновления не совпала. Файл удалён, установка отменена.")
             self.finished_download.emit(str(destination), "")
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
             try:

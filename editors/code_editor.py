@@ -144,11 +144,48 @@ class CodeEditor(QPlainTextEdit):
         cursor.insertText(completion)
         self.setTextCursor(cursor)
 
+    def set_editor_font_size(self, delta=0, reset=False):
+        size = 11 if reset else max(8, min(24, self.font().pointSize() + delta))
+        font = self.font()
+        font.setPointSize(size)
+        self.setFont(font)
+        self.setTabStopDistance(4 * self.fontMetrics().horizontalAdvance(" "))
+
+    def wheelEvent(self, event):
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self.set_editor_font_size(1 if event.angleDelta().y() > 0 else -1)
+            event.accept()
+            return
+        super().wheelEvent(event)
+
     def keyPressEvent(self, event):
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            if event.key() in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
+                self.set_editor_font_size(1)
+                return
+            if event.key() == Qt.Key.Key_Minus:
+                self.set_editor_font_size(-1)
+                return
+            if event.key() == Qt.Key.Key_0:
+                self.set_editor_font_size(reset=True)
+                return
+        if event.text() in {"{", "[", "(", '"', "'"} and not event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            closing = {"{": "}", "[": "]", "(": ")", '"': '"', "'": "'"}[event.text()]
+            cursor = self.textCursor()
+            if cursor.hasSelection():
+                selected = cursor.selectedText()
+                cursor.insertText(event.text() + selected + closing)
+            else:
+                cursor.insertText(event.text() + closing)
+                cursor.movePosition(cursor.MoveOperation.Left)
+            self.setTextCursor(cursor)
+            return
         if event.matches(QKeySequence.StandardKey.InsertParagraphSeparator):
             cursor = self.textCursor()
             line = cursor.block().text()
             indent = line[:len(line) - len(line.lstrip(" \t"))]
+            if line.rstrip().endswith(("{", "[", "(")):
+                indent += "    "
             super().keyPressEvent(event)
             self.textCursor().insertText(indent)
             return

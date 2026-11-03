@@ -12,7 +12,7 @@ Windows desktop editor for SkyRealm mod projects.
 - Learning course, limited SkyRealm API catalog and educational starter templates.
 - GitHub Releases update check and portable EXE update flow with SHA-256 verification when the release asset exposes a digest.
 
-## Advanced tools (1.6.0)
+## Advanced tools (1.7.0)
 
 Open **Все инструменты** in a project to access:
 
@@ -22,8 +22,8 @@ Open **Все инструменты** in a project to access:
 - **Asset gallery:** imports sprites, audio and fonts into `assets/`; previews supported images and opens other formats externally.
 - **Node debugger / V8 profiler:** optional breakpoints, continue/step controls, scope-variable inspection, watch expressions, console/exception events and V8 CPU profiling. Requires Node.js; code runs locally with the user's permissions and is never sandboxed.
 - **Compatibility check:** compares explicitly declared `gameVersion`, `minGameVersion` and `maxGameVersion` against a selected game version; it cannot certify runtime APIs.
-- **Local mod manager:** discovers subprojects in `mods/*/mod.json`, stores enable flags, resolves dependency order, detects disabled/missing dependencies, conflicts and cycles, and exports `mods.loadorder.json`. The game must implement a loader for this file before it affects runtime.
-- **ZIP packager:** validates project metadata and dependencies, skips symlinks and excluded folders, writes atomically, then verifies the resulting ZIP.
+- **Local mod manager:** discovers subprojects in `mods/*/mod.json`, stores enable flags, resolves dependency order using an iterative graph algorithm (including large dependency chains), detects disabled/missing dependencies, conflicts and cycles, and exports `mods.loadorder.json`. The game must implement a loader for this file before it affects runtime.
+- **ZIP packager:** validates project metadata and dependencies, uses one shared atomic archive builder for both project export and mod packaging, skips symlinks and private/history folders, then verifies the resulting ZIP.
 - **Git viewer:** reads repository status and recent commits without performing destructive Git operations.
 - **Live Studio logs:** displays log records emitted by Studio tools. It is not connected to the game's runtime logs.
 

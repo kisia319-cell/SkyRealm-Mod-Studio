@@ -10,8 +10,8 @@ def resolve_load_order(mods):
     for mod_id, mod in enabled.items():
         deps = mod.get("dependencies", [])
         conflicts = mod.get("conflicts", [])
-        deps = set(deps.keys()) if isinstance(deps, dict) else set(deps) if isinstance(deps, list) else set()
-        conflicts = set(conflicts.keys()) if isinstance(conflicts, dict) else set(conflicts) if isinstance(conflicts, list) else set()
+        deps = set(deps.keys()) if isinstance(deps, dict) else set(deps) if isinstance(deps, (list, set, frozenset, tuple)) else set()
+        conflicts = set(conflicts.keys()) if isinstance(conflicts, dict) else set(conflicts) if isinstance(conflicts, (list, set, frozenset, tuple)) else set()
         for dep in deps:
             if not isinstance(dep, str) or not dep:
                 continue

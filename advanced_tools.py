@@ -356,10 +356,24 @@ class AdvancedToolsDialog(QDialog):
             mod_id = item.data(Qt.ItemDataRole.UserRole)
             if mod_id:
                 state[mod_id] = item.checkState() == Qt.CheckState.Checked
+        temp_name = None
         try:
-            (self.folder / ".studio-mods.json").write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+            fd, temp_name = tempfile.mkstemp(prefix=".studio-mods-", suffix=".tmp", dir=str(self.folder))
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\\n") as stream:
+                json.dump(state, stream, ensure_ascii=False, indent=2)
+                stream.write("\\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp_name, self.folder / ".studio-mods.json")
+            temp_name = None
         except OSError as exc:
             logging.error("Cannot save local mod states: %s", exc)
+        finally:
+            if temp_name and os.path.exists(temp_name):
+                try:
+                    os.unlink(temp_name)
+                except OSError:
+                    pass
 
     def _build_package(self):
         page = QWidget()

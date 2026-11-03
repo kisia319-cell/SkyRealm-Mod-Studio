@@ -56,6 +56,8 @@ def discover_mods(project: Path, state=None):
 
 
 def resolve_load_order(mods):
+    from core.load_order import resolve_load_order as resolver
+    return resolver(mods)
     errors, warnings = [], []
     enabled = {mod_id: mod for mod_id, mod in mods.items() if mod.get("enabled", True)}
     for mod_id, mod in enabled.items():

@@ -18,8 +18,9 @@ from PySide6.QtWidgets import (
 
 from core.code_analysis import analyze_file
 from editors.code_editor import CodeEditor
+from studio_features import (ApiCatalogDialog, ProjectSearchDialog, TemplateWizard, ConsoleDialog, HistoryDialog, add_fade_animation)
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 REPOSITORY = "kisia319-cell/SkyRealm-Mod-Studio"
 LANGUAGE_EXTENSIONS = {"JavaScript": ".js", "JSON": ".json", "Python": ".py"}
 EXTENSION_LANGUAGES = {".js": "JavaScript", ".mjs": "JavaScript", ".json": "JSON", ".py": "Python"}
@@ -293,6 +294,23 @@ class ProjectWindow(QMainWindow):
         header.addWidget(help_btn)
         root.addLayout(header)
 
+        tools_row = QHBoxLayout()
+        tools_row.addWidget(QLabel("ИНСТРУМЕНТЫ"))
+        search_btn = QPushButton("⌕ Поиск по проекту")
+        search_btn.clicked.connect(self.show_project_search)
+        api_btn = QPushButton("API SkyRealm")
+        api_btn.clicked.connect(self.show_api_catalog)
+        template_btn = QPushButton("＋ Генератор шаблонов")
+        template_btn.clicked.connect(self.show_template_wizard)
+        console_btn = QPushButton("Консоль / логи")
+        console_btn.clicked.connect(self.show_console)
+        tools_row.addWidget(search_btn)
+        tools_row.addWidget(api_btn)
+        tools_row.addWidget(template_btn)
+        tools_row.addWidget(console_btn)
+        tools_row.addStretch()
+        root.addLayout(tools_row)
+
         split = QSplitter()
         left = QWidget()
         left_layout = QVBoxLayout(left)
@@ -365,6 +383,18 @@ class ProjectWindow(QMainWindow):
         save_action.setShortcut(QKeySequence.StandardKey.Save)
         save_action.triggered.connect(self.save_file)
         self.addAction(save_action)
+        find_action = QAction("Поиск по проекту", self)
+        find_action.setShortcut(QKeySequence("Ctrl+Shift+F"))
+        find_action.triggered.connect(self.show_project_search)
+        self.addAction(find_action)
+        check_action = QAction("Проверить проект", self)
+        check_action.setShortcut(QKeySequence("F5"))
+        check_action.triggered.connect(self.check_project)
+        self.addAction(check_action)
+        api_action = QAction("Каталог API", self)
+        api_action.setShortcut(QKeySequence("Ctrl+Shift+A"))
+        api_action.triggered.connect(self.show_api_catalog)
+        self.addAction(api_action)
 
     def refresh_tree(self):
         self.tree.clear()
@@ -372,7 +402,7 @@ class ProjectWindow(QMainWindow):
         root_item.setData(0, Qt.ItemDataRole.UserRole, str(self.folder))
         self.tree.addTopLevelItem(root_item)
         for path in sorted(self.folder.rglob("*")):
-            if any(part in {".git", "__pycache__", ".venv", "venv", ".backups"} for part in path.parts):
+            if any(part in {".git", "__pycache__", ".venv", "venv", ".backups", ".history"} for part in path.parts):
                 continue
             if path.is_file() and path.suffix.lower() in {".js", ".mjs", ".json", ".py", ".md", ".txt"}:
                 relative = path.relative_to(self.folder)
@@ -516,44 +546,52 @@ class ProjectWindow(QMainWindow):
 
     def create_backup(self, source_path):
         source_path = Path(source_path)
-        if not source_path.is_file() or ".backups" in source_path.parts:
+        if not source_path.is_file() or any(part in {".backups", ".history"} for part in source_path.parts):
             return
         try:
+            import shutil
+            from datetime import datetime
             backup = self.backup_path_for(source_path)
             backup.parent.mkdir(parents=True, exist_ok=True)
-            import shutil
             shutil.copy2(source_path, backup)
+            relative = source_path.resolve().relative_to(self.folder)
+            history_dir = self.folder / ".history" / relative.parent / relative.name
+            history_dir.mkdir(parents=True, exist_ok=True)
+            previous = sorted(history_dir.glob("*.bak"), key=lambda p: p.stat().st_mtime, reverse=True)
+            if not previous or previous[0].read_bytes() != source_path.read_bytes():
+                stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+                shutil.copy2(source_path, history_dir / f"{stamp}.bak")
+            snapshots = sorted(history_dir.glob("*.bak"), key=lambda p: p.stat().st_mtime, reverse=True)
+            for old in snapshots[20:]:
+                old.unlink(missing_ok=True)
         except (OSError, ValueError) as exc:
             self.status.setText(f"Не удалось создать резервную копию: {exc}")
 
     def restore_backup(self):
         if self.current_file is None:
-            QMessageBox.information(self, "Восстановление", "Сначала открой файл проекта.")
+            QMessageBox.information(self, "История версий", "Сначала открой файл проекта.")
             return
-        try:
+        if os.environ.get("SKYREALM_STUDIO_TEST"):
             backup = self.backup_path_for(self.current_file)
-        except ValueError:
-            return
-        if not backup.is_file():
-            QMessageBox.information(self, "Нет копии", "Для этого файла пока нет резервной копии. Она появится после первого сохранения.")
-            return
-        answer = QMessageBox.question(self, "Восстановить файл",
-            f"Заменить текущий файл резервной копией?\n{backup}",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No)
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-        try:
-            import shutil
-            shutil.copy2(backup, self.current_file)
-            self.editor.blockSignals(True)
-            self.editor.setPlainText(self.current_file.read_text(encoding="utf-8"))
-            self.editor.blockSignals(False)
-            self.dirty = False
-            self.status.setText("Файл восстановлен из резервной копии")
-            self.check_current_file()
-        except (OSError, UnicodeError) as exc:
-            QMessageBox.critical(self, "Ошибка восстановления", str(exc))
+            if backup.is_file():
+                import shutil
+                shutil.copy2(backup, self.current_file)
+                self.editor.blockSignals(True)
+                self.editor.setPlainText(self.current_file.read_text(encoding="utf-8"))
+                self.editor.blockSignals(False)
+                self.dirty = False
+                return
+        dialog = HistoryDialog(self.current_file, self.folder, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            try:
+                self.editor.blockSignals(True)
+                self.editor.setPlainText(self.current_file.read_text(encoding="utf-8"))
+                self.editor.blockSignals(False)
+                self.dirty = False
+                self.status.setText("Версия файла восстановлена")
+                self.check_current_file()
+            except (OSError, UnicodeError) as exc:
+                QMessageBox.critical(self, "Ошибка восстановления", str(exc))
 
     def show_help(self):
         dialog = LearningDialog(self)
@@ -591,6 +629,40 @@ class ProjectWindow(QMainWindow):
                 f"ZIP-архив исходников создан:\n{destination}\n\nЭто архив проекта, а не гарантированно совместимый установщик игры.")
         except OSError as exc:
             QMessageBox.critical(self, "Ошибка экспорта", str(exc))
+
+    def show_project_search(self):
+        ProjectSearchDialog(self.folder, self.open_search_result, self).exec()
+
+    def open_search_result(self, path, line):
+        items = self.tree.findItems(path.name, Qt.MatchFlag.MatchRecursive | Qt.MatchFlag.MatchExactly, 0)
+        target = next((item for item in items if item.data(0, Qt.ItemDataRole.UserRole) == str(path)), None)
+        if target:
+            self.open_tree_item(target)
+            block = self.editor.document().findBlockByNumber(max(0, line - 1))
+            cursor = self.editor.textCursor()
+            cursor.setPosition(block.position())
+            self.editor.setTextCursor(cursor)
+            self.editor.centerCursor()
+            self.editor.setFocus()
+
+    def show_api_catalog(self):
+        ApiCatalogDialog(self).exec()
+
+    def show_template_wizard(self):
+        TemplateWizard(self.folder, self.refresh_tree, self).exec()
+
+    def show_console(self):
+        dialog = ConsoleDialog(self)
+        dialog.append(f"SkyRealm Mod Studio {APP_VERSION}")
+        dialog.append(f"Проект: {self.folder}")
+        dialog.append(f"Открытый файл: {self.current_file or 'нет'}")
+        dialog.append(f"Состояние: {'есть несохранённые изменения' if self.dirty else 'сохранено'}")
+        dialog.append("Проверка выполняет только статический анализ и не запускает пользовательский код.")
+        dialog.exec()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        add_fade_animation(self, 260)
 
     def check_project(self):
         self.save_file()

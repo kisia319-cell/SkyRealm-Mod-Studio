@@ -1,16 +1,23 @@
 name: Build SkyRealm Mod Studio
+
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
+    tags: [ "v*" ]
     paths:
       - "main.py"
+      - "updater.py"
+      - "core/**"
+      - "editors/**"
       - "requirements.txt"
       - ".github/workflows/build-studio.yml"
 
 jobs:
   build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,11 +27,20 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
+      - name: Compile Python sources
+        run: python -m compileall -q main.py core editors updater.py
       - name: Build standalone executable
         run: pyinstaller --noconfirm --clean --onefile --windowed --name SkyRealmModStudio main.py
-      - uses: actions/upload-artifact@v4
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
           name: SkyRealmModStudio-EXE
           path: dist/SkyRealmModStudio.exe
           if-no-files-found: error
           retention-days: 30
+      - name: Publish versioned release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/SkyRealmModStudio.exe
+          generate_release_notes: true

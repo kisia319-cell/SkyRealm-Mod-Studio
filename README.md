@@ -19,7 +19,7 @@ Open **Все инструменты** in a project to access:
 - **Smart static analyzer:** detects selected risky JavaScript patterns while ignoring strings and ordinary comments; reports TODO/FIXME in comments and malformed JSON/Python. Findings are heuristics and require review; user code is never executed.
 - **Strict project validation:** checks manifest field types, ID/version formats, safe entry paths, duplicate mod IDs, missing dependencies and declared conflicts. Missing dependencies are warnings because they may be supplied externally.
 - **Visual data designer:** forms for items, weapons, mobs, quests, biomes, NPC dialogues and world events, with raw JSON synchronization, structured list editing and a frame timeline for animations. Files are Studio-side formats until the game implements matching loaders.
-- **Asset gallery:** imports sprites, audio and fonts into `assets/`; previews supported images and opens other formats externally.
+- **Asset gallery:** imports sprites, audio and fonts into `assets/`; previews supported images and opens other formats externally.\n- **Node debugger / V8 profiler:** optional breakpoints, continue/step controls, console/exception events and V8 CPU profiling. Requires Node.js; code runs locally with the user's permissions and is never sandboxed.
 - **Compatibility check:** compares explicitly declared `gameVersion`, `minGameVersion` and `maxGameVersion` against a selected game version; it cannot certify runtime APIs.
 - **Local mod manager:** discovers subprojects in `mods/*/mod.json` and stores Studio-side enable flags in `.studio-mods.json`. These flags do not load or unload mods in the game.
 - **ZIP packager:** validates project metadata and dependencies, skips symlinks and excluded folders, writes atomically, then verifies the resulting ZIP.
@@ -28,7 +28,7 @@ Open **Все инструменты** in a project to access:
 
 ## Important runtime compatibility note
 
-The visual designers create project data files. They do **not** make those entities appear in SkyRealm automatically. The matching game runtime must implement and document loaders for each data format, event, animation, biome, item, weapon, mob or quest. The current editor does not execute arbitrary mod code, and a successful syntax check does not certify gameplay compatibility.
+The visual designers create project data files. They do **not** make those entities appear in SkyRealm automatically. The matching game runtime must implement and document loaders for each data format, event, animation, biome, item, weapon, mob or quest. The current editor does not execute arbitrary mod code during diagnostics. The optional debugger/profiler can execute a selected JavaScript file only after explicit user confirmation; it is not sandboxed. A successful syntax check does not certify gameplay compatibility.
 
 JavaScript is the current mod scripting language described by Studio. JSON stores metadata and designer data. Python can be edited and syntax-checked, but Python mod execution inside SkyRealm is not supported by this statement.
 

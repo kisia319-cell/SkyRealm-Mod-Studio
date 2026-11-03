@@ -74,6 +74,31 @@ class VisualDesignerTests(unittest.TestCase):
             widget.stop_animation_preview()
             self.assertFalse(widget._preview_timer.isActive())
             widget.close()
+    def test_animation_frames_can_be_reordered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            widget = VisualDataDesigner(Path(tmp))
+            widget.kind.setCurrentText("Анимация")
+            widget.add_frame()
+            widget.add_frame()
+            widget.frames.item(0, 0).setText("first.png")
+            widget.frames.item(1, 0).setText("second.png")
+            widget.frames.setCurrentCell(1, 0)
+            widget.move_frame(-1)
+            frames = json.loads(widget.raw.toPlainText())["frames"]
+            self.assertEqual(frames[0]["sprite"], "second.png")
+            self.assertEqual(frames[1]["sprite"], "first.png")
+            widget.close()
+
+    def test_non_finite_animation_values_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            widget = VisualDataDesigner(Path(tmp))
+            widget.kind.setCurrentText("Анимация")
+            widget.add_frame()
+            widget.frames.item(0, 2).setText("nan")
+            with self.assertRaises(ValueError):
+                widget._read_frames()
+            widget.close()
+
     def test_invalid_frame_values_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             widget = VisualDataDesigner(Path(tmp))

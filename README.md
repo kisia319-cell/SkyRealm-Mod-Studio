@@ -18,7 +18,7 @@ Open **Все инструменты** in a project to access:
 
 - **Smart static analyzer:** detects selected risky JavaScript patterns while ignoring strings and ordinary comments; reports TODO/FIXME in comments and malformed JSON/Python. Findings are heuristics and require review; user code is never executed.
 - **Strict project validation:** checks manifest field types, ID/version formats, safe entry paths, duplicate mod IDs, missing dependencies and declared conflicts. Missing dependencies are warnings because they may be supplied externally.
-- **Visual data designer:** forms for items, weapons, mobs, quests, biomes, NPC dialogues and world events, with raw JSON synchronization, structured list editing and a frame timeline for animations. Files are Studio-side formats until the game implements matching loaders.
+- **Visual data designer:** forms for items, weapons, mobs, quests, biomes, NPC dialogues and world events, with raw JSON synchronization, structured list editing, existing-file loading, and an animation timeline with frame playback. Files are Studio-side formats until the game implements matching loaders.
 - **Asset gallery:** imports sprites, audio and fonts into `assets/`; previews supported images and opens other formats externally.
 - **Node debugger / V8 profiler:** optional breakpoints, continue/step controls, scope-variable inspection, watch expressions, console/exception events and V8 CPU profiling. Requires Node.js; code runs locally with the user's permissions and is never sandboxed.
 - **Compatibility check:** compares explicitly declared `gameVersion`, `minGameVersion` and `maxGameVersion` against a selected game version; it cannot certify runtime APIs.
@@ -60,7 +60,7 @@ The executable is written to `dist/SkyRealmModStudio.exe`.
 
 ## Releases and updates
 
-Pushing supported source changes to `main` triggers the Windows build and updates the stable GitHub Release `v1.6.0`. The release asset is named `SkyRealmModStudio.exe`. Update checks and downloads require an internet connection. Users can decline an update and install it later.
+Pushing supported source changes to `main` triggers the Windows build and updates the stable GitHub Release `v1.7.0`. The release asset is named `SkyRealmModStudio.exe`. Update checks and downloads require an internet connection. Users can decline an update and install it later.
 
 ## Safety and packaging
 

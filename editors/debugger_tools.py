@@ -29,6 +29,7 @@ def parse_breakpoints(value):
 
 class InspectorWorker(QThread):
     output = Signal(str)
+    paused_changed = Signal(bool)
 
     def __init__(self, websocket_url, script_url, breakpoints, parent=None):
         super().__init__(parent)
@@ -108,6 +109,7 @@ class InspectorWorker(QThread):
                 method = message.get("method")
                 params = message.get("params", {})
                 if method == "Debugger.paused":
+                    self.paused_changed.emit(True)
                     frames = params.get("callFrames") or []
                     if frames:
                         frame = frames[0]
@@ -131,6 +133,7 @@ class InspectorWorker(QThread):
                         self.output.emit(f"⏸ Выполнение приостановлено: {params.get('reason', 'breakpoint')}")
                 elif method == "Debugger.resumed":
                     self.current_call_frame_id = None
+                    self.paused_changed.emit(False)
                     self.output.emit("▶ Выполнение продолжено.")
                 elif method == "Runtime.consoleAPICalled":
                     args = params.get("args", [])
@@ -184,6 +187,7 @@ class NodeDebuggerWidget(QWidget):
         self.profiler_process.finished.connect(self._profiler_finished)
         self.profiler_process.errorOccurred.connect(self._process_error)
         self.worker = None
+        self._debug_paused = False
         self._inspector_url_seen = False
         self._processing_profile = False
         self._profile_started_at = 0.0
@@ -268,7 +272,7 @@ class NodeDebuggerWidget(QWidget):
         self.run_button.setEnabled(bool(checked and idle and self.file_combo.count()))
         self.profile_button.setEnabled(bool(checked and idle and self.file_combo.count()))
         for button in (self.continue_button, self.over_button, self.into_button, self.out_button):
-            button.setEnabled(self.worker is not None and self.worker.isRunning())
+            button.setEnabled(self.worker is not None and self.worker.isRunning() and self._debug_paused)
         self.stop_button.setEnabled(
             self.debug_process.state() != QProcess.ProcessState.NotRunning
             or self.profiler_process.state() != QProcess.ProcessState.NotRunning
@@ -320,7 +324,8 @@ class NodeDebuggerWidget(QWidget):
                 self._inspector_url_seen = True
                 self.worker = InspectorWorker(match.group(1), path.as_uri(), lines, self)
                 self.worker.output.connect(self._append)
-                self.worker.finished.connect(lambda: self._update_enabled(self.confirm.isChecked()))
+                self.worker.paused_changed.connect(self._set_debug_paused)
+                self.worker.finished.connect(lambda: self._set_debug_paused(False))
                 self.worker.start()
                 self._update_enabled(self.confirm.isChecked())
 
@@ -335,6 +340,10 @@ class NodeDebuggerWidget(QWidget):
             self.worker.stop()
             self.worker.wait(1500)
             self.worker = None
+        self._update_enabled(self.confirm.isChecked())
+
+    def _set_debug_paused(self, paused):
+        self._debug_paused = bool(paused)
         self._update_enabled(self.confirm.isChecked())
 
     def _send(self, method):
@@ -364,6 +373,7 @@ class NodeDebuggerWidget(QWidget):
         if self.worker:
             self.worker.wait(1500)
             self.worker = None
+        self._debug_paused = False
         self._processing_profile = False
         self._profile_log_path = None
         self._update_enabled(self.confirm.isChecked())

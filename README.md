@@ -2,33 +2,40 @@
 
 Windows desktop editor for SkyRealm mod projects.
 
-## Features
+## Core features
 
-- Create projects in JavaScript, JSON, or Python.
-- Open existing projects and quickly return to recent projects.
-- Project file tree with create, rename, and delete actions.
-- Code editor with syntax highlighting, line numbers, indentation, completion, and autosave.
-- Syntax diagnostics for JavaScript (Node.js), Python (AST), and JSON.
-- Click a diagnostic to jump to its line.
-- Project checks, ZIP source export, and backup/restore.
-- Built-in learning course with nine lessons: project structure, variables, objects, conditions, functions, loops, debugging, practice, and SkyRealm modding limitations.
-- First-launch choice to view the course or skip it. The course remains available from the home screen and the editor's Help button.
-- GitHub Releases update check. When a newer release is found, the app asks whether to download and install it. The EXE is validated, replaced after the app exits, and the previous executable is retained as a backup.
+- Create, open and revisit JavaScript, JSON and Python projects.
+- Project tree with file creation, rename and delete.
+- Code editor with syntax highlighting, line numbers, completion, indentation and autosave.
+- Static syntax checks for JavaScript (Node.js), Python (AST) and JSON.
+- Background project checks, project search, formatting, backup and version history.
+- Learning course, limited SkyRealm API catalog and educational starter templates.
+- GitHub Releases update check and portable EXE update flow.
 
-## Productivity tools
+## Advanced tools (1.4.0)
 
-The API catalog documents only a limited host surface and warns that game-runtime support is version-dependent. Generated item, weapon, mob, and ability files are educational data templates; they do not create working game entities unless the corresponding API is implemented by SkyRealm. The built-in log displays Studio/project status and does not execute shell commands or mod code.
+Open **Все инструменты** in a project to access:
 
-## Languages and compatibility
+- **Smart static analyzer:** flags selected risky patterns, unfinished TODO/FIXME markers and malformed JSON/Python. Findings are heuristics and require review; user code is never executed.
+- **Data designers:** create and validate JSON files for items, weapons, mobs, quests, animations and biomes under `data/`.
+- **Local mod manager:** discovers subprojects in `mods/*/mod.json` and stores Studio-side enable flags in `.studio-mods.json`. These flags do not load or unload mods in the game.
+- **ZIP packager:** validates basic `mod.json` fields and packages source files while excluding caches, dependencies and backups.
+- **Git viewer:** reads repository status and recent commits without performing destructive Git operations.
+- **Live Studio logs:** displays log records emitted by Studio tools. It is not connected to the game's runtime logs.
 
-JavaScript is the current scripting language used by Mod Studio. JSON stores metadata and data. Python can be edited and syntax-checked, but running Python mods inside SkyRealm is not supported by this statement. A successful syntax check does not grant code access to the game: actual gameplay features require a documented API supported by the matching SkyRealm runtime.
+## Important runtime compatibility note
 
-## Requirements for development
+The visual designers create project data files. They do **not** make those entities appear in SkyRealm automatically. The matching game runtime must implement and document loaders for each data format, event, animation, biome, item, weapon, mob or quest. The current editor does not execute arbitrary mod code, and a successful syntax check does not certify gameplay compatibility.
+
+JavaScript is the current mod scripting language described by Studio. JSON stores metadata and designer data. Python can be edited and syntax-checked, but Python mod execution inside SkyRealm is not supported by this statement.
+
+## Development requirements
 
 - Windows 10/11, 64-bit
 - Python 3.12+
 - PySide6 6.9.3
 - Node.js is optional and required for JavaScript syntax diagnostics
+- Git is optional and required for the Git viewer
 
 ## Run from source
 
@@ -41,7 +48,7 @@ py -3.12 main.py
 
 ```powershell
 py -3.12 -m pip install -r requirements.txt pyinstaller
-py -3.12 -m compileall -q main.py core editors updater.py tests
+py -3.12 -m compileall -q main.py core editors updater.py advanced_tools.py tests
 py -3.12 -m PyInstaller --noconfirm --clean --onefile --windowed --name SkyRealmModStudio main.py
 ```
 
@@ -49,8 +56,8 @@ The executable is written to `dist/SkyRealmModStudio.exe`.
 
 ## Releases and updates
 
-Pushing a change to the `main` branch builds the EXE and publishes/updates the stable GitHub Release `v1.2.0`. The release asset must be named `SkyRealmModStudio.exe`; the app checks the latest release on startup. For a future version, update `APP_VERSION` in `main.py` and the `tag_name` in `.github/workflows/build-studio.yml` together. Update checks and downloads require an internet connection. Users can decline an update and install it later.
+Pushing supported source changes to `main` triggers the Windows build and updates the stable GitHub Release `v1.4.0`. The release asset is named `SkyRealmModStudio.exe`. Update checks and downloads require an internet connection. Users can decline an update and install it later.
 
-## Safety
+## Safety and packaging
 
-Code diagnostics only parse or syntax-check source files; they do not execute mod code. ZIP export packages source files only and does not certify compatibility with a specific SkyRealm game build.
+Diagnostics only parse or inspect source text; they do not execute mod code. ZIP export packages project sources and data only; it is not a signed installer and does not certify compatibility with a specific SkyRealm build. Never place API keys, passwords, access tokens or private credentials in a mod project.

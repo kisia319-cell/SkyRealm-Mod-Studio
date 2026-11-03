@@ -12,6 +12,7 @@ import sys
 import zipfile
 from pathlib import Path
 from core.smart_analysis import scan_javascript
+from editors.data_designer import VisualDataDesigner
 
 from PySide6.QtCore import Qt, QProcess, QProcessEnvironment
 from PySide6.QtGui import QFont
@@ -130,74 +131,7 @@ class AdvancedToolsDialog(QDialog):
         logging.info("Smart analysis completed: %s files, %s findings", checked, len(findings))
 
     def _build_data_editor(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        form = QFormLayout()
-        self.data_type = QComboBox()
-        self.data_type.addItems(DATA_TYPES.keys())
-        self.data_filename = QLineEdit()
-        self.data_filename.setPlaceholderText("например, frost_sword.json")
-        form.addRow("Тип данных:", self.data_type)
-        form.addRow("Имя файла:", self.data_filename)
-        layout.addLayout(form)
-        layout.addWidget(QLabel("Редактируй JSON-описание. Это формат проекта Studio, не подтверждённый формат игрового runtime."))
-        self.data_editor = QPlainTextEdit()
-        self.data_editor.setFont(QFont("Consolas", 10))
-        layout.addWidget(self.data_editor, 1)
-        self.data_type.currentTextChanged.connect(self._load_data_template)
-        self._load_data_template(self.data_type.currentText())
-        row = QHBoxLayout()
-        validate = QPushButton("Проверить JSON")
-        validate.clicked.connect(self._validate_data)
-        save = QPushButton("Сохранить файл данных")
-        save.clicked.connect(self._save_data_file)
-        row.addWidget(validate)
-        row.addStretch()
-        row.addWidget(save)
-        layout.addLayout(row)
-        return page
-
-    def _load_data_template(self, kind):
-        _, template = DATA_TYPES[kind]
-        self.data_editor.setPlainText(json.dumps(template, ensure_ascii=False, indent=4))
-        self.data_filename.clear()
-
-    def _validate_data(self):
-        try:
-            data = json.loads(self.data_editor.toPlainText())
-            if not isinstance(data, dict):
-                raise ValueError("В корне JSON должен находиться объект.")
-            if not data.get("id"):
-                raise ValueError("Добавь обязательное поле id.")
-            if not data.get("name") and not data.get("title"):
-                raise ValueError("Добавь поле name или title.")
-            QMessageBox.information(self, "Проверка", "JSON корректен, обязательные поля присутствуют.")
-        except (json.JSONDecodeError, ValueError) as exc:
-            QMessageBox.warning(self, "Ошибка данных", str(exc))
-
-    def _save_data_file(self):
-        try:
-            data = json.loads(self.data_editor.toPlainText())
-            if not isinstance(data, dict) or not data.get("id"):
-                raise ValueError("Ожидается JSON-объект с полем id.")
-            if not (data.get("name") or data.get("title")):
-                raise ValueError("Добавь поле name или title.")
-            default_dir, _ = DATA_TYPES[self.data_type.currentText()]
-            safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(data["id"]).split(":")[-1]).strip("._") or "new_data"
-            filename = self.data_filename.text().strip() or (safe_id + ".json")
-            if Path(filename).name != filename or not filename.lower().endswith(".json"):
-                raise ValueError("Имя должно быть простым именем файла с расширением .json.")
-            target = self.folder / "data" / default_dir / filename
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if target.exists():
-                answer = QMessageBox.question(self, "Перезаписать файл?", f"{target.relative_to(self.folder)} уже существует. Перезаписать?")
-                if answer != QMessageBox.StandardButton.Yes:
-                    return
-            target.write_text(json.dumps(data, ensure_ascii=False, indent=4) + "\n", encoding="utf-8")
-            QMessageBox.information(self, "Сохранено", f"Создан файл:\n{target.relative_to(self.folder)}\n\nИгра должна отдельно поддерживать этот формат.")
-            logging.info("Created data file %s", target)
-        except (OSError, ValueError, json.JSONDecodeError) as exc:
-            QMessageBox.warning(self, "Не удалось сохранить", str(exc))
+        return VisualDataDesigner(self.folder, self)
 
     def _build_mod_manager(self):
         page = QWidget()

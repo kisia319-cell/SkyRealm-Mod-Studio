@@ -52,6 +52,29 @@ class VisualDataDesigner(QWidget):
         self.raw = QPlainTextEdit()
         self.raw.setPlaceholderText("JSON проекта")
         self.tabs.addTab(self.raw, "JSON")
+        self.list_page = QWidget()
+        list_layout = QVBoxLayout(self.list_page)
+        list_layout.addWidget(QLabel("Конструктор целей квестов, наград, способностей, узлов диалогов и действий событий. Каждый элемент хранится как отдельный JSON-объект или значение."))
+        self.list_field = QComboBox()
+        self.list_table = QTableWidget(0, 1)
+        self.list_table.setHorizontalHeaderLabels(["JSON элемента списка"])
+        self.list_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        list_layout.addWidget(self.list_field)
+        list_layout.addWidget(self.list_table, 1)
+        list_buttons = QHBoxLayout()
+        add_list = QPushButton("＋ Добавить элемент")
+        remove_list = QPushButton("Удалить выбранный")
+        add_list.clicked.connect(self._add_list_item)
+        remove_list.clicked.connect(self._remove_list_item)
+        list_buttons.addWidget(add_list)
+        list_buttons.addWidget(remove_list)
+        list_buttons.addStretch()
+        list_layout.addLayout(list_buttons)
+        self.tabs.addTab(self.list_page, "Квесты / диалоги / события")
+        self.preview = QLabel("Предпросмотр данных")
+        self.preview.setWordWrap(True)
+        self.preview.setObjectName("muted")
+        self.form_layout.addRow("Предпросмотр:", self.preview)
         self.animation_page = QWidget()
         anim_layout = QVBoxLayout(self.animation_page)
         anim_layout.addWidget(QLabel("Кадры анимации: спрайт/имя кадра, длительность и координаты"))
@@ -86,6 +109,8 @@ class VisualDataDesigner(QWidget):
         self.kind.currentTextChanged.connect(self.load_template)
         self.raw.textChanged.connect(self._raw_changed)
         self.frames.itemChanged.connect(self._frames_changed)
+        self.list_table.itemChanged.connect(self._list_table_changed)
+        self.list_field.currentTextChanged.connect(self._load_list_table)
         self.load_template(self.kind.currentText())
 
     def _clear_form(self):
@@ -132,10 +157,9 @@ class VisualDataDesigner(QWidget):
             self.form_layout.addRow(key, control)
         self.filename.setText(template["id"].split(":")[-1] + ".json")
         self.frames.setRowCount(0)
-        if kind == "Анимация":
-            self.tabs.setTabEnabled(2, True)
-        else:
-            self.tabs.setTabEnabled(2, False)
+        self._refresh_list_fields()
+        self.tabs.setTabEnabled(3, kind == "Анимация")
+        self.tabs.setTabEnabled(2, bool(self._array_controls))
         self._loading = False
         self._sync_raw()
 
@@ -191,6 +215,7 @@ class VisualDataDesigner(QWidget):
             self.raw.blockSignals(True)
             self.raw.setPlainText(json.dumps(data, ensure_ascii=False, indent=2))
             self.raw.blockSignals(False)
+            self._update_preview(data)
         except (ValueError, json.JSONDecodeError):
             self.raw.blockSignals(False)
 
@@ -223,6 +248,8 @@ class VisualDataDesigner(QWidget):
                     for frame in frame_data:
                         if isinstance(frame, dict):
                             self._insert_frame(frame)
+            self._load_list_table(self.list_field.currentText())
+            self._update_preview(data)
             self._loading = False
         except (ValueError, TypeError, json.JSONDecodeError):
             self._loading = False
@@ -230,6 +257,73 @@ class VisualDataDesigner(QWidget):
     def _frames_changed(self, _item):
         if not self._loading:
             self._sync_raw()
+
+    def _refresh_list_fields(self):
+        current = self.list_field.currentText()
+        self.list_field.blockSignals(True)
+        self.list_field.clear()
+        self.list_field.addItems(list(self._array_controls))
+        if current in self._array_controls:
+            self.list_field.setCurrentText(current)
+        self.list_field.blockSignals(False)
+        self._load_list_table(self.list_field.currentText())
+
+    def _load_list_table(self, field):
+        if not hasattr(self, "list_table"):
+            return
+        self._loading = True
+        self.list_table.setRowCount(0)
+        control = self._array_controls.get(field)
+        if control:
+            try:
+                values = json.loads(control.toPlainText() or "[]")
+                if isinstance(values, list):
+                    for value in values:
+                        self._insert_list_row(value)
+            except json.JSONDecodeError:
+                pass
+        self._loading = False
+
+    def _insert_list_row(self, value=None):
+        row = self.list_table.rowCount()
+        self.list_table.insertRow(row)
+        self.list_table.setItem(row, 0, QTableWidgetItem(json.dumps(value if value is not None else {}, ensure_ascii=False)))
+
+    def _add_list_item(self):
+        self._insert_list_row({})
+        self._list_table_changed(None)
+
+    def _remove_list_item(self):
+        rows = sorted({index.row() for index in self.list_table.selectedIndexes()}, reverse=True)
+        for row in rows:
+            self.list_table.removeRow(row)
+        self._list_table_changed(None)
+
+    def _list_table_changed(self, _item):
+        if self._loading:
+            return
+        field = self.list_field.currentText()
+        control = self._array_controls.get(field)
+        if not control:
+            return
+        values = []
+        try:
+            for row in range(self.list_table.rowCount()):
+                item = self.list_table.item(row, 0)
+                values.append(json.loads(item.text()) if item else {})
+        except json.JSONDecodeError:
+            return
+        control.blockSignals(True)
+        control.setPlainText(json.dumps(values, ensure_ascii=False, indent=2))
+        control.blockSignals(False)
+        self._sync_raw()
+
+    def _update_preview(self, data):
+        if not hasattr(self, "preview"):
+            return
+        label = data.get("name") or data.get("title") or "(без названия)"
+        self.preview.setText(f"{self.kind.currentText()} • {label} • ID: {data.get('id', '—')} • Полей: {len(data)}")
+
 
     def _insert_frame(self, frame=None):
         if not isinstance(frame, dict):

@@ -10,7 +10,7 @@ Windows desktop editor for SkyRealm mod projects.
 - Static syntax checks for JavaScript (Node.js), Python (AST) and JSON.
 - Background project checks, project search, formatting, backup and version history.
 - Learning course, limited SkyRealm API catalog and educational starter templates.
-- GitHub Releases update check and portable EXE update flow.
+- GitHub Releases update check and portable EXE update flow with SHA-256 verification when the release asset exposes a digest.
 
 ## Advanced tools (1.5.0)
 

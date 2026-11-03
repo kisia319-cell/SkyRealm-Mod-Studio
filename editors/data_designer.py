@@ -405,12 +405,19 @@ class VisualDataDesigner(QWidget):
             data = json.loads(self.raw.toPlainText())
             directory, _ = DATA_TYPES[self.kind.currentText()]
             filename = self.filename.text().strip() or (data["id"].split(":")[-1] + ".json")
-            if Path(filename).name != filename or not filename.lower().endswith(".json"):
+            if (Path(filename).name != filename or "/" in filename or "\\" in filename
+                    or not filename.lower().endswith(".json")):
                 raise ValueError("Имя файла должно быть простым именем с расширением .json.")
-            target = (self.folder / "data" / directory / filename).resolve()
             base = (self.folder / "data" / directory).resolve()
-            if base not in target.parents:
-                raise ValueError("Путь сохранения выходит за пределы папки данных.")
+            try:
+                base.relative_to(self.folder)
+            except ValueError as exc:
+                raise ValueError("Папка данных не должна вести за пределы проекта.") from exc
+            target = (base / filename).resolve()
+            try:
+                target.relative_to(base)
+            except ValueError as exc:
+                raise ValueError("Путь сохранения выходит за пределы папки данных.") from exc
             target.parent.mkdir(parents=True, exist_ok=True)
             if target.exists():
                 answer = QMessageBox.question(self, "Перезаписать?", f"{target.name} уже существует. Перезаписать?")

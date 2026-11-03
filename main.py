@@ -1070,7 +1070,7 @@ class StudioWindow(QMainWindow):
     def download_update(self, info):
         from updater import DownloadWorker
         self.update_status.setText("Скачиваю обновление…")
-        self._download_thread = DownloadWorker(info["url"], self)
+        self._download_thread = DownloadWorker(info["url"], self, info.get("sha256"))
         self._download_thread.finished_download.connect(self.on_update_downloaded)
         self._download_thread.start()
 

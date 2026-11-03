@@ -37,6 +37,14 @@ class PublisherTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 prepare_release(root, root / "release.zip")
 
+    def test_rejects_non_text_release_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_project(Path(tmp) / "project")
+            with self.assertRaises(ValueError):
+                prepare_release(root, Path(tmp) / "release.zip", game_version=123)
+            with self.assertRaises(ValueError):
+                prepare_release(root, Path(tmp) / "release.zip", notes=None)
+
     def test_rejects_invalid_project(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "project"

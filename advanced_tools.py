@@ -194,7 +194,8 @@ class AdvancedToolsDialog(QDialog):
             if not (data.get("name") or data.get("title")):
                 raise ValueError("Добавь поле name или title.")
             default_dir, _ = DATA_TYPES[self.data_type.currentText()]
-            filename = self.data_filename.text().strip() or (str(data["id"]).split(":")[-1] + ".json")
+            safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(data["id"]).split(":")[-1]).strip("._") or "new_data"
+            filename = self.data_filename.text().strip() or (safe_id + ".json")
             if Path(filename).name != filename or not filename.lower().endswith(".json"):
                 raise ValueError("Имя должно быть простым именем файла с расширением .json.")
             target = self.folder / "data" / default_dir / filename
@@ -214,6 +215,7 @@ class AdvancedToolsDialog(QDialog):
         layout = QVBoxLayout(page)
         layout.addWidget(QLabel("Локальный каталог подпроектов в папке mods/. Флажки сохраняются в .studio-mods.json и сами по себе не включают моды в игре."))
         self.mod_list = QListWidget()
+        self.mod_list.itemChanged.connect(self._save_mod_states)
         layout.addWidget(self.mod_list, 1)
         row = QHBoxLayout()
         refresh = QPushButton("Обновить список")
@@ -250,7 +252,6 @@ class AdvancedToolsDialog(QDialog):
                 self.mod_list.addItem(item)
             except (OSError, json.JSONDecodeError):
                 self.mod_list.addItem(f"Повреждён manifest: {manifest}")
-        self.mod_list.itemChanged.connect(self._save_mod_states)
 
     def _save_mod_states(self, _item=None):
         state = {}

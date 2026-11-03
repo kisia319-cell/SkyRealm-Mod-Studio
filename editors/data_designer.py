@@ -342,7 +342,7 @@ class VisualDataDesigner(QWidget):
             if key in {"id", "name", "title", "sprite", "frames"} or isinstance(value, (dict, list)):
                 continue
             details.append(f"{key}: {value}")
-        self.preview.setText("\\n".join(details[:7]))
+        self.preview.setText("\n".join(details[:7]))
         self.preview_image.setPixmap(QPixmap())
         sprite = data.get("sprite")
         if isinstance(sprite, str) and sprite.strip():

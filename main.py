@@ -23,7 +23,7 @@ from editors.code_editor import CodeEditor
 from studio_features import (ApiCatalogDialog, ProjectSearchDialog, TemplateWizard, ConsoleDialog, HistoryDialog, add_fade_animation)
 from advanced_tools import AdvancedToolsDialog
 
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.7.1"
 REPOSITORY = "kisia319-cell/SkyRealm-Mod-Studio"
 LANGUAGE_EXTENSIONS = {"JavaScript": ".js", "JSON": ".json", "Python": ".py"}
 EXTENSION_LANGUAGES = {".js": "JavaScript", ".mjs": "JavaScript", ".json": "JSON", ".py": "Python"}

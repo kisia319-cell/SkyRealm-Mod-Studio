@@ -249,9 +249,13 @@ class NodeDebuggerWidget(QWidget):
         self.file_combo.clear()
         excluded = {".git", ".venv", "venv", "node_modules", "__pycache__", "build", "dist"}
         for path in sorted(self.folder.rglob("*"), key=lambda item: str(item).casefold()):
-            if not path.is_file() or path.suffix.lower() not in {".js", ".mjs", ".cjs"}:
+            if path.is_symlink() or not path.is_file() or path.suffix.lower() not in {".js", ".mjs", ".cjs"}:
                 continue
             if any(part in excluded for part in path.relative_to(self.folder).parts):
+                continue
+            try:
+                path.resolve().relative_to(self.folder)
+            except ValueError:
                 continue
             self.file_combo.addItem(str(path.relative_to(self.folder)), str(path))
         if current:
@@ -272,7 +276,16 @@ class NodeDebuggerWidget(QWidget):
 
     def _selected_file(self):
         value = self.file_combo.currentData()
-        return Path(value) if value else None
+        if not value:
+            return None
+        path = Path(value)
+        if path.is_symlink() or not path.is_file():
+            return None
+        try:
+            path.resolve().relative_to(self.folder)
+        except ValueError:
+            return None
+        return path
 
     def start_debugger(self):
         if not self.confirm.isChecked():

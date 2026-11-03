@@ -45,7 +45,7 @@ The executable is written to `dist/SkyRealmModStudio.exe`.
 
 ## Auto-updates
 
-The application checks the latest GitHub Release in `kisia319-cell/SkyRealm-Mod-Studio`. To publish an update, push a version tag such as `v1.1.1`; GitHub Actions builds the EXE and attaches it to the release. The release asset must be named `SkyRealmModStudio.exe`. Update checks are best-effort and require an internet connection.
+The application checks the latest GitHub Release in `kisia319-cell/SkyRealm-Mod-Studio`. To publish the first release or a later update, open Actions → Build SkyRealm Mod Studio → Run workflow and enter a version such as `1.1.0` in `release_version`; alternatively, push a version tag such as `v1.1.1`. GitHub Actions builds the EXE and attaches it to the release. The release asset must be named `SkyRealmModStudio.exe`. Update checks are best-effort and require an internet connection.
 
 ## Safety notes
 

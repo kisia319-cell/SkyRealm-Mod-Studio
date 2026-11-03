@@ -54,6 +54,7 @@ jobs:
           python tests/test_visual_designer.py
           python tests/test_debugger_tools.py
           python tests/test_mod_manager.py
+          python tests/test_archive_builder.py
       - name: Build standalone executable
         run: pyinstaller --noconfirm --clean --onefile --windowed --name SkyRealmModStudio main.py
       - name: Upload build artifact
@@ -67,7 +68,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.6.0
+          tag_name: v1.7.0
           target_commitish: main
           files: dist/SkyRealmModStudio.exe
           overwrite_files: true

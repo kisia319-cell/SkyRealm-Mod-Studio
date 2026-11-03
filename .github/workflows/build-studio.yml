@@ -48,6 +48,7 @@ jobs:
           python tests/test_smart_analysis.py
           python tests/test_compatibility.py
           python tests/test_visual_designer.py
+          python tests/test_debugger_tools.py
       - name: Build standalone executable
         run: pyinstaller --noconfirm --clean --onefile --windowed --name SkyRealmModStudio main.py
       - name: Upload build artifact

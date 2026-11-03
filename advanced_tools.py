@@ -72,7 +72,8 @@ class AdvancedToolsDialog(QDialog):
         self.tabs.addTab(self._build_analyzer(), "Умный анализатор")
         self.tabs.addTab(self._build_data_editor(), "Визуальные редакторы")
         self.tabs.addTab(self._build_assets(), "Галерея ресурсов")
-        self.tabs.addTab(NodeDebuggerWidget(self.folder, self), "Отладчик / профайлер")
+        self.debugger_widget = NodeDebuggerWidget(self.folder, self)
+        self.tabs.addTab(self.debugger_widget, "Отладчик / профайлер")
         self.tabs.addTab(self._build_mod_manager(), "Менеджер модов")
         self.tabs.addTab(self._build_package(), "Сборщик")
         self.tabs.addTab(self._build_git(), "Git")
@@ -476,6 +477,9 @@ class AdvancedToolsDialog(QDialog):
             QMessageBox.warning(self, "Не удалось открыть папку", str(exc))
 
     def closeEvent(self, event):
+        debugger = getattr(self, "debugger_widget", None)
+        if debugger:
+            debugger.stop_all()
         handler = getattr(self, "log_handler", None)
         if handler:
             logging.getLogger().removeHandler(handler)

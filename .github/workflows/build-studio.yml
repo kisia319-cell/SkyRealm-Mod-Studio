@@ -1,5 +1,9 @@
 name: Build SkyRealm Mod Studio
 
+concurrency:
+  group: skyrealm-mod-studio-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
     inputs:

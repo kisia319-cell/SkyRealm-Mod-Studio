@@ -24,7 +24,7 @@ def analyze_file(path: Path, text: str):
         node = shutil.which("node")
         if not node:
             issues.append((1, 1, "Проверка JavaScript недоступна",
-                           "Установи Node.js, чтобы проверять синтаксис JavaScript."))
+                           "Node.js не найден. Установи Node.js LTS и перезапусти Mod Studio."))
         else:
             temp_path = None
             try:
@@ -34,7 +34,7 @@ def analyze_file(path: Path, text: str):
                     temp_path = Path(temp.name)
                 result = subprocess.run(
                     [node, "--check", str(temp_path)],
-                    text=True, capture_output=True, timeout=5,
+                    text=True, capture_output=True, timeout=15,
                     encoding="utf-8", errors="replace",
                 )
                 if result.returncode:
@@ -49,7 +49,8 @@ def analyze_file(path: Path, text: str):
                             col = int(match.group(2))
                     issues.append((line, col, "Ошибка JavaScript", message[-1200:]))
             except subprocess.TimeoutExpired:
-                issues.append((1, 1, "Проверка JavaScript прервана", "Node.js не ответил за 5 секунд."))
+                issues.append((1, 1, "Проверка JavaScript прервана",
+                               "Node.js не ответил за 15 секунд. Проверь установку Node.js и попробуй снова."))
             except OSError as exc:
                 issues.append((1, 1, "Не удалось проверить JavaScript", str(exc)))
             finally:

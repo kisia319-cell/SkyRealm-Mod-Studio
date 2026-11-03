@@ -48,7 +48,7 @@ QFrame#panel{background:#111a30;border:1px solid #263552;border-radius:14px}
 
 def project_metadata(folder: Path):
     path = folder / "mod.json"
-    if not path.is_file():
+    if path.is_symlink() or not path.is_file():
         raise ValueError("В выбранной папке нет mod.json. Выбери папку проекта SkyRealm Mod Studio.")
     data = json.loads(path.read_text(encoding="utf-8"))
     if (not isinstance(data, dict)

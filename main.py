@@ -19,8 +19,9 @@ from PySide6.QtWidgets import (
 from core.code_analysis import analyze_file
 from editors.code_editor import CodeEditor
 from studio_features import (ApiCatalogDialog, ProjectSearchDialog, TemplateWizard, ConsoleDialog, HistoryDialog, add_fade_animation)
+from advanced_tools import AdvancedToolsDialog
 
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.4.0"
 REPOSITORY = "kisia319-cell/SkyRealm-Mod-Studio"
 LANGUAGE_EXTENSIONS = {"JavaScript": ".js", "JSON": ".json", "Python": ".py"}
 EXTENSION_LANGUAGES = {".js": "JavaScript", ".mjs": "JavaScript", ".json": "JSON", ".py": "Python"}
@@ -364,10 +365,13 @@ class ProjectWindow(QMainWindow):
         template_btn.clicked.connect(self.show_template_wizard)
         console_btn = QPushButton("Консоль / логи")
         console_btn.clicked.connect(self.show_console)
+        advanced_btn = QPushButton("Все инструменты")
+        advanced_btn.clicked.connect(self.show_advanced_tools)
         tools_row.addWidget(search_btn)
         tools_row.addWidget(api_btn)
         tools_row.addWidget(template_btn)
         tools_row.addWidget(console_btn)
+        tools_row.addWidget(advanced_btn)
         tools_row.addStretch()
         root.addLayout(tools_row)
 
@@ -743,6 +747,9 @@ class ProjectWindow(QMainWindow):
 
     def show_template_wizard(self):
         TemplateWizard(self.folder, self.refresh_tree, self).exec()
+
+    def show_advanced_tools(self):
+        AdvancedToolsDialog(self.folder, self).exec()
 
     def show_console(self):
         dialog = ConsoleDialog(self)

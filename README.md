@@ -1,19 +1,26 @@
 # SkyRealm Mod Studio
 
-Official desktop tool for creating SkyRealm modifications.
+Desktop tool for creating and editing SkyRealm modifications.
 
-## Current version
+## Current workflow
 
-The main screen has two working actions:
-- **Создать мод** — opens a project dialog, lets you enter a mod name and choose a destination folder, then creates a starter mod project.
-- **Выйти из Studio** — closes the application.
+1. Click **Создать мод** on the start screen.
+2. Enter a project name and choose its parent folder.
+3. The Studio creates a project and opens the editor automatically.
 
-A new mod project contains:
-- `mod.json` — basic mod metadata
-- `scripts/main.js` — JavaScript entry point
-- `README.md` — project description
+## Project editor
+
+- **Обзор проекта** — edit mod name, version, author and description.
+- **Редактор кода** — edit `scripts/main.js`.
+- Project file list — view `mod.json` and `README.md`.
+- **Сохранить** — writes metadata and script changes to disk.
+- **Открыть папку** — opens the project in Windows Explorer.
+- **На главный экран** — returns to the Studio start screen and asks about unsaved changes.
+
+Each new project contains `mod.json`, `scripts/main.js` and `README.md`.
 
 ## Requirements
+
 - Windows 10/11
 - Python 3.12+
 - PySide6 6.9.3

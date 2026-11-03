@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import subprocess
+import shutil
 import sys
 import zipfile
 from pathlib import Path
@@ -15,7 +16,7 @@ from core.smart_analysis import scan_javascript
 from editors.data_designer import VisualDataDesigner
 
 from PySide6.QtCore import Qt, QProcess, QProcessEnvironment
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPixmap, QIcon
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, QLabel, QPushButton,
     QPlainTextEdit, QComboBox, QLineEdit, QFormLayout, QMessageBox, QFileDialog,
@@ -66,6 +67,7 @@ class AdvancedToolsDialog(QDialog):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_analyzer(), "Умный анализатор")
         self.tabs.addTab(self._build_data_editor(), "Визуальные редакторы")
+        self.tabs.addTab(self._build_assets(), "Галерея ресурсов")
         self.tabs.addTab(self._build_mod_manager(), "Менеджер модов")
         self.tabs.addTab(self._build_package(), "Сборщик")
         self.tabs.addTab(self._build_git(), "Git")
@@ -132,6 +134,117 @@ class AdvancedToolsDialog(QDialog):
 
     def _build_data_editor(self):
         return VisualDataDesigner(self.folder, self)
+
+    def _build_assets(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.addWidget(QLabel("Локальная библиотека ресурсов проекта. Изображения можно просматривать; аудио открывается внешним проигрывателем."))
+        split = QSplitter()
+        self.asset_list = QListWidget()
+        self.asset_list.currentItemChanged.connect(self._preview_asset)
+        split.addWidget(self.asset_list)
+        preview_panel = QWidget()
+        preview_layout = QVBoxLayout(preview_panel)
+        self.asset_preview = QLabel("Выбери ресурс")
+        self.asset_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.asset_preview.setMinimumSize(260, 220)
+        self.asset_preview.setWordWrap(True)
+        preview_layout.addWidget(self.asset_preview, 1)
+        self.asset_details = QLabel("")
+        self.asset_details.setWordWrap(True)
+        preview_layout.addWidget(self.asset_details)
+        split.addWidget(preview_panel)
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 2)
+        layout.addWidget(split, 1)
+        row = QHBoxLayout()
+        add = QPushButton("Импортировать ресурсы…")
+        add.clicked.connect(self._import_assets)
+        refresh = QPushButton("Обновить")
+        refresh.clicked.connect(self._refresh_assets)
+        open_file = QPushButton("Открыть ресурс")
+        open_file.clicked.connect(self._open_selected_asset)
+        row.addWidget(add)
+        row.addWidget(refresh)
+        row.addStretch()
+        row.addWidget(open_file)
+        layout.addLayout(row)
+        self._refresh_assets()
+        return page
+
+    def _refresh_assets(self):
+        if not hasattr(self, "asset_list"):
+            return
+        self.asset_list.clear()
+        root = self.folder / "assets"
+        if not root.is_dir():
+            self.asset_preview.setText("Папка assets/ пока пуста")
+            self.asset_details.clear()
+            return
+        for path in sorted(root.rglob("*"), key=lambda item: str(item).casefold()):
+            if not path.is_file() or any(part in EXCLUDED_DIRS for part in path.parts):
+                continue
+            if path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".wav", ".mp3", ".ogg", ".flac", ".ttf", ".otf"}:
+                continue
+            item = QListWidgetItem(f"{path.relative_to(root)}")
+            item.setData(Qt.ItemDataRole.UserRole, str(path))
+            if path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}:
+                pixmap = QPixmap(str(path))
+                if not pixmap.isNull():
+                    item.setIcon(QIcon(pixmap.scaled(48, 48, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)))
+            self.asset_list.addItem(item)
+
+    def _preview_asset(self, item, _previous=None):
+        if not item:
+            return
+        path = Path(item.data(Qt.ItemDataRole.UserRole))
+        try:
+            size = path.stat().st_size
+            self.asset_details.setText(f"{path.name}\n{size:,} байт • {path.suffix.lower()}")
+            if path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}:
+                pixmap = QPixmap(str(path))
+                if pixmap.isNull():
+                    self.asset_preview.setText("Не удалось прочитать изображение")
+                else:
+                    self.asset_preview.setPixmap(pixmap.scaled(520, 420, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            else:
+                self.asset_preview.setPixmap(QPixmap())
+                self.asset_preview.setText("Предпросмотр этого формата не поддерживается. Нажми «Открыть ресурс».")
+        except OSError as exc:
+            self.asset_preview.setText(str(exc))
+
+    def _import_assets(self):
+        files, _ = QFileDialog.getOpenFileNames(self, "Импортировать ресурсы", str(Path.home()), "Ресурсы (*.png *.jpg *.jpeg *.webp *.bmp *.gif *.wav *.mp3 *.ogg *.flac *.ttf *.otf)")
+        if not files:
+            return
+        copied = 0
+        errors = []
+        for source_name in files:
+            source = Path(source_name)
+            kind = "sprites" if source.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"} else "audio" if source.suffix.lower() in {".wav", ".mp3", ".ogg", ".flac"} else "fonts"
+            destination_dir = self.folder / "assets" / kind
+            try:
+                destination_dir.mkdir(parents=True, exist_ok=True)
+                destination = destination_dir / source.name
+                stem, suffix, index = source.stem, source.suffix, 1
+                while destination.exists():
+                    destination = destination_dir / f"{stem}_{index}{suffix}"
+                    index += 1
+                shutil.copy2(source, destination)
+                copied += 1
+            except OSError as exc:
+                errors.append(f"{source.name}: {exc}")
+        self._refresh_assets()
+        report = f"Импортировано файлов: {copied}"
+        if errors:
+            report += "\n\nОшибки:\n" + "\n".join(errors)
+        QMessageBox.information(self, "Импорт ресурсов", report)
+        logging.info("Imported %s project assets", copied)
+
+    def _open_selected_asset(self):
+        item = self.asset_list.currentItem()
+        if item:
+            self._open_path(Path(item.data(Qt.ItemDataRole.UserRole)))
 
     def _build_mod_manager(self):
         page = QWidget()

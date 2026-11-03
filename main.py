@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from core.code_analysis import analyze_file
 from core.project_validation import validate_project
+from core.archive_builder import create_project_archive
 from editors.code_editor import CodeEditor
 from studio_features import (ApiCatalogDialog, ProjectSearchDialog, TemplateWizard, ConsoleDialog, HistoryDialog, add_fade_animation)
 from advanced_tools import AdvancedToolsDialog
@@ -709,20 +710,19 @@ class ProjectWindow(QMainWindow):
 
     def export_project(self):
         self.save_file()
+        if self.dirty:
+            return
         suggested = str(self.folder.parent / (self.folder.name + ".zip"))
         destination, _ = QFileDialog.getSaveFileName(self, "Экспорт проекта", suggested, "ZIP архив (*.zip)")
         if not destination:
             return
         try:
-            destination_path = Path(destination).resolve()
-            with zipfile.ZipFile(destination_path, "w", zipfile.ZIP_DEFLATED) as archive:
-                for path in self.folder.rglob("*"):
-                    if (path.is_file() and path.resolve() != destination_path
-                            and not any(part in {".git", "__pycache__", ".venv", "venv", ".backups"} for part in path.parts)):
-                        archive.write(path, path.relative_to(self.folder))
-            QMessageBox.information(self, "Экспорт завершён",
-                f"ZIP-архив исходников создан:\n{destination}\n\nЭто архив проекта, а не гарантированно совместимый установщик игры.")
-        except OSError as exc:
+            target, count = create_project_archive(self.folder, destination)
+            QMessageBox.information(
+                self, "Экспорт завершён",
+                f"ZIP-архив исходников создан:\n{target}\nФайлов: {count}\nПроверка целостности: пройдена.\n\nЭто архив проекта, а не гарантированно совместимый установщик игры."
+            )
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
             QMessageBox.critical(self, "Ошибка экспорта", str(exc))
 
     def show_project_search(self):

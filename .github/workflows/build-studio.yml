@@ -20,14 +20,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
-      - name: Build executable
-        run: pyinstaller --noconfirm --clean --windowed --name SkyRealmModStudio main.py
-      - name: Package app
-        run: Compress-Archive -Path dist/SkyRealmModStudio/* -DestinationPath SkyRealmModStudio-Windows.zip
-        shell: pwsh
+      - name: Build standalone executable
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name SkyRealmModStudio main.py
       - uses: actions/upload-artifact@v4
         with:
-          name: SkyRealmModStudio-Windows
-          path: SkyRealmModStudio-Windows.zip
+          name: SkyRealmModStudio-EXE
+          path: dist/SkyRealmModStudio.exe
           if-no-files-found: error
           retention-days: 30

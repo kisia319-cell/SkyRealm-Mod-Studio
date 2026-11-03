@@ -486,12 +486,31 @@ class VisualDataDesigner(QWidget):
             data = json.loads(self.raw.toPlainText())
             if not isinstance(data, dict):
                 raise ValueError("Корень JSON должен быть объектом.")
+            template = DATA_TYPES[self.kind.currentText()][1]
+            for key, default in template.items():
+                if key not in data:
+                    raise ValueError(f"Отсутствует обязательное поле: {key}.")
+                value = data[key]
+                if isinstance(default, bool):
+                    valid = type(value) is bool
+                elif isinstance(default, int):
+                    valid = type(value) is int
+                elif isinstance(default, float):
+                    valid = not isinstance(value, bool) and isinstance(value, (int, float))
+                elif isinstance(default, list):
+                    valid = isinstance(value, list)
+                else:
+                    valid = isinstance(value, str)
+                if not valid:
+                    raise ValueError(f"Поле {key} имеет неверный тип.")
             if not isinstance(data.get("id"), str) or not data["id"].strip():
                 raise ValueError("Поле id должно быть непустой строкой.")
             label = data.get("name") or data.get("title")
             if not isinstance(label, str) or not label.strip():
                 raise ValueError("Нужно непустое текстовое поле name или title.")
             if self.kind.currentText() == "Анимация":
+                if any(not isinstance(frame, dict) for frame in data["frames"]):
+                    raise ValueError("Каждый кадр анимации должен быть JSON-объектом.")
                 self._read_frames()
             QMessageBox.information(self, "Проверка", "JSON корректен, основные поля проверены. Поддержка игровым runtime не подтверждена.")
             return True

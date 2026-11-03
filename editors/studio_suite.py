@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QFileSystemWatcher, QTimer, QThreadPool, QRunnable, QObject, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QImage, QPainter, QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QPushButton,
     QPlainTextEdit, QLineEdit, QComboBox, QListWidget, QListWidgetItem,
@@ -451,8 +451,11 @@ class StudioSuiteWidget(QWidget):
         refresh.clicked.connect(self._scan_catalog)
         import_btn = QPushButton("Импортировать ZIP-мод…")
         import_btn.clicked.connect(self._import_catalog_zip)
+        docs_btn = QPushButton("Создать README + иконку")
+        docs_btn.clicked.connect(self._generate_mod_docs)
         row.addWidget(refresh)
         row.addWidget(import_btn)
+        row.addWidget(docs_btn)
         layout.addLayout(row)
         self._scan_catalog()
         return page
@@ -470,6 +473,50 @@ class StudioSuiteWidget(QWidget):
                     self.catalog_list.addItem(f"Повреждён: {manifest.parent.name}")
         if self.catalog_list.count() == 0:
             self.catalog_list.addItem("Локальные моды не найдены.")
+
+    def _generate_mod_docs(self):
+        manifest = self.root / "mod.json"
+        try:
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("mod.json должен быть JSON-объектом.")
+            name = str(data.get("name") or self.root.name).strip()
+            version = str(data.get("version") or "1.0.0")
+            author = str(data.get("author") or "Не указан")
+            description = str(data.get("description") or "Описание мода пока не добавлено.")
+            readme = (
+                f"# {name}\n\n{description}\n\n"
+                f"## Информация\n\n- Версия: {version}\n- Автор: {author}\n"
+                f"- ID: {data.get('id', 'не указан')}\n"
+                f"- Главный файл: {data.get('entry', 'не указан')}\n\n"
+                "## Установка\n\nПомести папку мода в каталог модов SkyRealm. "
+                "Убедись, что версия мода совместима с установленной версией игры.\n"
+            )
+            readme_path = self.root / "README.md"
+            if readme_path.exists():
+                answer = QMessageBox.question(self, "README уже существует", "Заменить существующий README.md?")
+                if answer != QMessageBox.StandardButton.Yes:
+                    return
+            readme_path.write_text(readme, encoding="utf-8")
+            icon_path = self.root / "assets" / "icon.png"
+            icon_path.parent.mkdir(parents=True, exist_ok=True)
+            image = QImage(256, 256, QImage.Format.Format_ARGB32)
+            image.fill(QColor("#10213a"))
+            painter = QPainter(image)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setBrush(QColor("#1d765d"))
+            painter.setPen(QColor("#65edb1"))
+            painter.drawRoundedRect(18, 18, 220, 220, 44, 44)
+            painter.setPen(QColor("#f2fff8"))
+            painter.setFont(QFont("Segoe UI", 88, QFont.Weight.Bold))
+            initials = "".join(part[0] for part in name.split()[:2]).upper() or "S"
+            painter.drawText(image.rect(), Qt.AlignmentFlag.AlignCenter, initials[:2])
+            painter.end()
+            if not image.save(str(icon_path), "PNG"):
+                raise OSError("Не удалось сохранить assets/icon.png.")
+            QMessageBox.information(self, "Материалы созданы", "Созданы README.md и assets/icon.png. Проверь описание и замени автоматически созданную иконку при необходимости.")
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+            QMessageBox.warning(self, "Не удалось создать материалы", str(exc))
 
     def _import_catalog_zip(self):
         filename, _ = QFileDialog.getOpenFileName(self, "Выбрать ZIP мода", str(Path.home()), "ZIP (*.zip)")

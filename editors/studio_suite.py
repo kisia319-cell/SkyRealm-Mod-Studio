@@ -314,8 +314,8 @@ class StudioSuiteWidget(QWidget):
             return
         self.test_button.setEnabled(True)
         self.test_output.setPlainText(
-            f"Проверено файлов: {checked}\\nНайдено замечаний: {len(issues)}\\n\\n"
-            + ("\\n".join(issues) if issues else "Статические проверки пройдены. Это не заменяет запуск в игре.")
+            f"Проверено файлов: {checked}\nНайдено замечаний: {len(issues)}\n\n"
+            + ("\n".join(issues) if issues else "Статические проверки пройдены. Это не заменяет запуск в игре.")
         )
 
     def _dependency_page(self):

@@ -20,9 +20,9 @@ Open **Все инструменты** in a project to access:
 - **Strict project validation:** checks manifest field types, ID/version formats, safe entry paths, duplicate mod IDs, missing dependencies and declared conflicts. Missing dependencies are warnings because they may be supplied externally.
 - **Visual data designer:** forms for items, weapons, mobs, quests, biomes, NPC dialogues and world events, with raw JSON synchronization, structured list editing and a frame timeline for animations. Files are Studio-side formats until the game implements matching loaders.
 - **Asset gallery:** imports sprites, audio and fonts into `assets/`; previews supported images and opens other formats externally.
-- **Node debugger / V8 profiler:** optional breakpoints, continue/step controls, console/exception events and V8 CPU profiling. Requires Node.js; code runs locally with the user's permissions and is never sandboxed.
+- **Node debugger / V8 profiler:** optional breakpoints, continue/step controls, scope-variable inspection, watch expressions, console/exception events and V8 CPU profiling. Requires Node.js; code runs locally with the user's permissions and is never sandboxed.
 - **Compatibility check:** compares explicitly declared `gameVersion`, `minGameVersion` and `maxGameVersion` against a selected game version; it cannot certify runtime APIs.
-- **Local mod manager:** discovers subprojects in `mods/*/mod.json` and stores Studio-side enable flags in `.studio-mods.json`. These flags do not load or unload mods in the game.
+- **Local mod manager:** discovers subprojects in `mods/*/mod.json`, stores enable flags, resolves dependency order, detects disabled/missing dependencies, conflicts and cycles, and exports `mods.loadorder.json`. The game must implement a loader for this file before it affects runtime.
 - **ZIP packager:** validates project metadata and dependencies, skips symlinks and excluded folders, writes atomically, then verifies the resulting ZIP.
 - **Git viewer:** reads repository status and recent commits without performing destructive Git operations.
 - **Live Studio logs:** displays log records emitted by Studio tools. It is not connected to the game's runtime logs.

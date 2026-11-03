@@ -4,9 +4,14 @@ Official desktop tool for creating SkyRealm modifications.
 
 ## Current version
 
-This first prototype contains only the main screen:
-- **Создать мод** — currently shows a placeholder message; the mod editor is the next development stage.
+The main screen has two working actions:
+- **Создать мод** — opens a project dialog, lets you enter a mod name and choose a destination folder, then creates a starter mod project.
 - **Выйти из Studio** — closes the application.
+
+A new mod project contains:
+- `mod.json` — basic mod metadata
+- `scripts/main.js` — JavaScript entry point
+- `README.md` — project description
 
 ## Requirements
 - Windows 10/11

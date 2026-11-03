@@ -25,7 +25,7 @@ class StudioSuiteTests(unittest.TestCase):
     def test_safe_path_accepts_project_file(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            self.assertEqual(_safe_project_path(root, "assets/frame.png"), root / "assets" / "frame.png")
+            self.assertEqual(_safe_project_path(root, "assets/frame.png"), (root / "assets" / "frame.png").resolve())
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from core.project_validation import validate_manifest, validate_project
 from core.compatibility import check_compatibility
 from core.mod_manager import discover_mods, resolve_load_order, export_load_order
 from core.archive_builder import create_project_archive
+from core.publisher import prepare_release
 from editors.data_designer import VisualDataDesigner
 from editors.sprite_editor import SpriteEditorDialog
 from editors.debugger_tools import NodeDebuggerWidget
@@ -79,6 +80,7 @@ class AdvancedToolsDialog(QDialog):
         self.tabs.addTab(self.debugger_widget, "Отладчик / профайлер")
         self.tabs.addTab(self._build_mod_manager(), "Менеджер модов")
         self.tabs.addTab(self._build_package(), "Сборщик")
+        self.tabs.addTab(self._build_publish(), "Центр публикации")
         self.tabs.addTab(self._build_git(), "Git")
         self.tabs.addTab(self._build_logs(), "Живые логи")
         root.addWidget(self.tabs, 1)
@@ -468,6 +470,94 @@ class AdvancedToolsDialog(QDialog):
             logging.info("Packaged project into %s (%s files)", target, count)
         except (OSError, ValueError, zipfile.BadZipFile) as exc:
             QMessageBox.critical(self, "Ошибка сборки", str(exc))
+
+
+    def _build_publish(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        intro = QLabel("Проверка проекта и подготовка локального релизного пакета: ZIP, release.json и SHA-256. Studio не загружает файлы на внешние площадки.")
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+        form = QFormLayout()
+        self.publish_game_version = QLineEdit()
+        self.publish_game_version.setPlaceholderText("например, 0.20.37")
+        self.publish_notes = QPlainTextEdit()
+        self.publish_notes.setPlaceholderText("Что нового в этой версии мода…")
+        self.publish_notes.setMaximumHeight(130)
+        form.addRow("Версия SkyRealm:", self.publish_game_version)
+        form.addRow("Описание релиза:", self.publish_notes)
+        layout.addLayout(form)
+        self.publish_report = QPlainTextEdit()
+        self.publish_report.setReadOnly(True)
+        layout.addWidget(self.publish_report, 1)
+        row = QHBoxLayout()
+        check = QPushButton("Проверить релиз")
+        check.clicked.connect(self._check_publish)
+        build = QPushButton("Подготовить пакет")
+        build.setObjectName("primary")
+        build.clicked.connect(self._prepare_publish)
+        row.addWidget(check)
+        row.addStretch()
+        row.addWidget(build)
+        layout.addLayout(row)
+        return page
+
+    def _check_publish(self):
+        _metadata, errors, warnings = validate_manifest(self.folder)
+        project_errors, project_warnings = validate_project(self.folder)
+        errors.extend(project_errors)
+        warnings.extend(project_warnings)
+        version = self.publish_game_version.text().strip()
+        compatibility_info = []
+        if version:
+            compat_errors, compat_warnings, compatibility_info = check_compatibility(self.folder, version)
+            errors.extend(compat_errors)
+            warnings.extend(compat_warnings)
+        else:
+            warnings.append("Версия SkyRealm не указана; совместимость по версии не проверялась.")
+        errors = list(dict.fromkeys(errors))
+        warnings = list(dict.fromkeys(warnings))
+        lines = ["Проверка публикации:"]
+        lines.extend("ERROR: " + value for value in errors)
+        lines.extend("WARNING: " + value for value in warnings)
+        lines.extend("INFO: " + value for value in compatibility_info)
+        lines.append("Проверка игровых API и фактического запуска в игре не выполняется.")
+        self.publish_report.setPlainText("\n".join(lines))
+        return not errors
+
+    def _prepare_publish(self):
+        if not self._check_publish():
+            QMessageBox.warning(self, "Публикация не готова", "Исправь ошибки в отчёте перед сборкой.")
+            return
+        destination, _ = QFileDialog.getSaveFileName(
+            self, "Сохранить релизный ZIP",
+            str(self.folder.parent / (self.folder.name + "-release.zip")), "ZIP (*.zip)"
+        )
+        if not destination:
+            return
+        try:
+            result = prepare_release(
+                self.folder, destination,
+                self.publish_game_version.text().strip(),
+                self.publish_notes.toPlainText()
+            )
+            lines = [
+                "ПАКЕТ ПОДГОТОВЛЕН",
+                f"Архив: {result['archive']}",
+                f"Файлов: {result['file_count']}",
+                f"SHA-256: {result['sha256']}",
+                f"Манифест: {result['manifest']}",
+                f"Контрольная сумма: {result['checksum']}"
+            ]
+            lines.extend("WARNING: " + value for value in result["warnings"])
+            self.publish_report.append("\n\n" + "\n".join(lines))
+            QMessageBox.information(
+                self, "Пакет подготовлен",
+                "Созданы ZIP, release.json и SHA-256. Загрузка на сайт или в каталог модов выполняется отдельно."
+            )
+            logging.info("Prepared release bundle for %s", self.folder.name)
+        except (OSError, ValueError) as exc:
+            QMessageBox.critical(self, "Ошибка подготовки", str(exc))
 
     def _build_git(self):
         page = QWidget()

@@ -129,6 +129,12 @@ class ProjectWindow(QMainWindow):
         metadata_btn = QPushButton("Настройки мода")
         metadata_btn.clicked.connect(self.edit_metadata)
         header.addWidget(metadata_btn)
+        backup_btn = QPushButton("Восстановить")
+        backup_btn.clicked.connect(self.restore_backup)
+        header.addWidget(backup_btn)
+        help_btn = QPushButton("Справка")
+        help_btn.clicked.connect(self.show_help)
+        header.addWidget(help_btn)
         root.addLayout(header)
 
         split = QSplitter()
@@ -210,7 +216,7 @@ class ProjectWindow(QMainWindow):
         root_item.setData(0, Qt.ItemDataRole.UserRole, str(self.folder))
         self.tree.addTopLevelItem(root_item)
         for path in sorted(self.folder.rglob("*")):
-            if any(part in {".git", "__pycache__", ".venv", "venv"} for part in path.parts):
+            if any(part in {".git", "__pycache__", ".venv", "venv", ".backups"} for part in path.parts):
                 continue
             if path.is_file() and path.suffix.lower() in {".js", ".mjs", ".json", ".py", ".md", ".txt"}:
                 relative = path.relative_to(self.folder)
@@ -271,6 +277,7 @@ class ProjectWindow(QMainWindow):
         if self.current_file is None:
             return
         try:
+            self.create_backup(self.current_file)
             self.current_file.write_text(self.editor.toPlainText(), encoding="utf-8")
             self.dirty = False
             self.status.setText("Сохранено")
@@ -339,12 +346,74 @@ class ProjectWindow(QMainWindow):
             "description": description_field.toPlainText().strip(),
         })
         try:
+            self.create_backup(self.folder / "mod.json")
             (self.folder / "mod.json").write_text(
                 json.dumps(self.metadata, ensure_ascii=False, indent=4), encoding="utf-8")
             self.setWindowTitle(f"SkyRealm Mod Studio — {self.metadata['name']}")
             self.status.setText("Настройки проекта сохранены")
         except OSError as exc:
             QMessageBox.critical(self, "Ошибка сохранения", str(exc))
+
+    def backup_path_for(self, source_path):
+        relative = Path(source_path).resolve().relative_to(self.folder)
+        return self.folder / ".backups" / relative.parent / (relative.name + ".bak")
+
+    def create_backup(self, source_path):
+        source_path = Path(source_path)
+        if not source_path.is_file() or ".backups" in source_path.parts:
+            return
+        try:
+            backup = self.backup_path_for(source_path)
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.copy2(source_path, backup)
+        except (OSError, ValueError) as exc:
+            self.status.setText(f"Не удалось создать резервную копию: {exc}")
+
+    def restore_backup(self):
+        if self.current_file is None:
+            QMessageBox.information(self, "Восстановление", "Сначала открой файл проекта.")
+            return
+        try:
+            backup = self.backup_path_for(self.current_file)
+        except ValueError:
+            return
+        if not backup.is_file():
+            QMessageBox.information(self, "Нет копии", "Для этого файла пока нет резервной копии. Она появится после первого сохранения.")
+            return
+        answer = QMessageBox.question(self, "Восстановить файл",
+            f"Заменить текущий файл резервной копией?\\n{backup}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            import shutil
+            shutil.copy2(backup, self.current_file)
+            self.editor.blockSignals(True)
+            self.editor.setPlainText(self.current_file.read_text(encoding="utf-8"))
+            self.editor.blockSignals(False)
+            self.dirty = False
+            self.status.setText("Файл восстановлен из резервной копии")
+            self.check_current_file()
+        except (OSError, UnicodeError) as exc:
+            QMessageBox.critical(self, "Ошибка восстановления", str(exc))
+
+    def show_help(self):
+        QMessageBox.information(self, "Справка SkyRealm Mod Studio",
+            "КАК РАБОТАТЬ\\n"
+            "1. Создай проект или открой папку с mod.json.\\n"
+            "2. Выбери файл слева, редактируй и сохраняй через Ctrl+S.\\n"
+            "3. Ctrl+Space открывает подсказки кода; Enter сохраняет отступ.\\n"
+            "4. Ошибки отображаются внизу редактора — нажми на ошибку, чтобы перейти к строке.\\n"
+            "5. «Проверить проект» проверяет mod.json и исходные файлы.\\n"
+            "6. «Экспорт ZIP» создаёт архив исходников проекта.\\n\\n"
+            "ЯЗЫКИ\\n"
+            "JavaScript — основной язык модов SkyRealm.\\n"
+            "JSON — данные и настройки.\\n"
+            "Python — редактирование и проверка синтаксиса; запуск Python-модов в игре пока не поддерживается.\\n\\n"
+            "РЕЗЕРВНЫЕ КОПИИ\\n"
+            "Перед сохранением последняя версия файла копируется в .backups. Кнопка «Восстановить» возвращает эту копию.")
 
     def format_current_file(self):
         if self.current_file is None:
@@ -372,7 +441,7 @@ class ProjectWindow(QMainWindow):
             with zipfile.ZipFile(destination_path, "w", zipfile.ZIP_DEFLATED) as archive:
                 for path in self.folder.rglob("*"):
                     if (path.is_file() and path.resolve() != destination_path
-                            and not any(part in {".git", "__pycache__", ".venv", "venv"} for part in path.parts)):
+                            and not any(part in {".git", "__pycache__", ".venv", "venv", ".backups"} for part in path.parts)):
                         archive.write(path, path.relative_to(self.folder))
             QMessageBox.information(self, "Экспорт завершён",
                 f"ZIP-архив исходников создан:\n{destination}\n\nЭто архив проекта, а не гарантированно совместимый установщик игры.")

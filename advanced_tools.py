@@ -242,7 +242,11 @@ class AdvancedToolsDialog(QDialog):
             kind = "sprites" if source.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"} else "audio" if source.suffix.lower() in {".wav", ".mp3", ".ogg", ".flac"} else "fonts"
             destination_dir = self.folder / "assets" / kind
             try:
+                assets_root = self.folder / "assets"
+                if assets_root.is_symlink() or destination_dir.is_symlink():
+                    raise ValueError("Папки ресурсов не должны быть символическими ссылками.")
                 destination_dir.mkdir(parents=True, exist_ok=True)
+                destination_dir.resolve().relative_to(self.folder)
                 destination = destination_dir / source.name
                 stem, suffix, index = source.stem, source.suffix, 1
                 while destination.exists():
@@ -250,7 +254,7 @@ class AdvancedToolsDialog(QDialog):
                     index += 1
                 shutil.copy2(source, destination)
                 copied += 1
-            except OSError as exc:
+            except (OSError, ValueError) as exc:
                 errors.append(f"{source.name}: {exc}")
         self._refresh_assets()
         report = f"Импортировано файлов: {copied}"

@@ -1,35 +1,52 @@
 # SkyRealm Mod Studio
 
-Desktop tool for creating and editing SkyRealm modifications.
+Windows desktop editor for SkyRealm mod projects.
 
-## Current workflow
+## Current features
 
-1. Click **Создать мод** on the start screen.
-2. Enter a project name and choose its parent folder.
-3. The Studio creates a project and opens the editor automatically.
+- Create projects in JavaScript, JSON, or Python.
+- Open an existing project by selecting its folder (it must contain a valid `mod.json`).
+- Recent project list.
+- Project file tree with create, rename, and delete actions.
+- Code editor with syntax highlighting, line numbers, indentation, and Ctrl+Space completion.
+- Automatic save and syntax diagnostics for JavaScript (Node.js), Python (AST), and JSON.
+- Click a diagnostic to jump to its line.
+- Basic safe formatting (JSON pretty-printing; whitespace cleanup for JS/Python).
+- Project syntax check and ZIP export of source files.
+- GitHub Releases update check and one-file EXE replacement on Windows.
 
-## Project editor
+## Languages
 
-- **Обзор проекта** — edit mod name, version, author and description.
-- **Редактор кода** — edit `scripts/main.js`.
-- Project file list — view `mod.json` and `README.md`.
-- **Сохранить** — writes metadata and script changes to disk.
-- **Открыть папку** — opens the project in Windows Explorer.
-- **На главный экран** — returns to the Studio start screen and asks about unsaved changes.
+JavaScript is the current game mod scripting language. JSON is used for project metadata and data files. Python is available as an editor language; running Python mods inside SkyRealm requires separate game-runtime support and is not implied by Studio.
 
-Each new project contains `mod.json`, `scripts/main.js` and `README.md`.
+## Requirements for development
 
-## Requirements
-
-- Windows 10/11
+- Windows 10/11, 64-bit
 - Python 3.12+
 - PySide6 6.9.3
+- Node.js is optional and required for JavaScript syntax diagnostics
 
-## Run
+## Run from source
 
 ```powershell
 py -3.12 -m pip install -r requirements.txt
 py -3.12 main.py
 ```
 
-Or double-click `run.bat`.
+## Build
+
+```powershell
+py -3.12 -m pip install -r requirements.txt pyinstaller
+py -3.12 -m compileall -q main.py core editors updater.py
+py -3.12 -m PyInstaller --noconfirm --clean --onefile --windowed --name SkyRealmModStudio main.py
+```
+
+The executable is written to `dist/SkyRealmModStudio.exe`.
+
+## Auto-updates
+
+The application checks the latest GitHub Release in `kisia319-cell/SkyRealm-Mod-Studio`. To publish an update, push a version tag such as `v1.1.1`; GitHub Actions builds the EXE and attaches it to the release. The release asset must be named `SkyRealmModStudio.exe`. Update checks are best-effort and require an internet connection.
+
+## Safety notes
+
+Code diagnostics parse or syntax-check source files; they do not execute mod code. ZIP export packages project source files only and does not certify compatibility with a specific SkyRealm game build.

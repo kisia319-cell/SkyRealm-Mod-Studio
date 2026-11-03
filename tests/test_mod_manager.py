@@ -47,8 +47,8 @@ class ModManagerTests(unittest.TestCase):
     def test_disabled_dependency_and_cycle_conflict(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            self.make_mod(root, "A", "mod.a", ["mod.b"])
-            self.make_mod(root, "B", "mod.b", ["mod.a"], ["mod.a"])
+            self.make_mod(root, "A", "mod.a", ["mod.b"], ["mod.b"])
+            self.make_mod(root, "B", "mod.b", ["mod.a"])
             mods, _, _ = discover_mods(root, {"mod.b": False})
             _, errors, _ = resolve_load_order(mods)
             self.assertTrue(any("отключена" in error for error in errors))

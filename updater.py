@@ -47,7 +47,7 @@ class UpdateWorker(QThread):
             self.finished_check.emit({"version": tag, "url": asset["browser_download_url"]}, "")
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
-                self.finished_check.emit(None, "")
+                self.finished_check.emit(None, "NO_RELEASE")
             else:
                 self.finished_check.emit(None, f"GitHub вернул HTTP {exc.code}.")
         except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:

@@ -10,7 +10,7 @@ def _mask_js(source):
     while i < n:
         ch = source[i]
         nxt = source[i + 1] if i + 1 < n else ""
-        if ch in ("'", '"', "\`"):
+        if ch in ("'", '"', "`"):
             quote = ch
             start = i
             i += 1

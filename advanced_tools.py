@@ -17,6 +17,7 @@ from core.smart_analysis import scan_javascript
 from core.project_validation import validate_manifest, validate_project
 from core.compatibility import check_compatibility
 from editors.data_designer import VisualDataDesigner
+from editors.debugger_tools import NodeDebuggerWidget
 
 from PySide6.QtCore import Qt, QProcess, QProcessEnvironment
 from PySide6.QtGui import QFont, QPixmap, QIcon
@@ -71,6 +72,7 @@ class AdvancedToolsDialog(QDialog):
         self.tabs.addTab(self._build_analyzer(), "Умный анализатор")
         self.tabs.addTab(self._build_data_editor(), "Визуальные редакторы")
         self.tabs.addTab(self._build_assets(), "Галерея ресурсов")
+        self.tabs.addTab(NodeDebuggerWidget(self.folder, self), "Отладчик / профайлер")
         self.tabs.addTab(self._build_mod_manager(), "Менеджер модов")
         self.tabs.addTab(self._build_package(), "Сборщик")
         self.tabs.addTab(self._build_git(), "Git")

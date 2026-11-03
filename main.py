@@ -7,7 +7,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QThreadPool, QRunnable, QObject, Signal
 from PySide6.QtGui import QFont, QKeySequence, QAction
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -20,7 +20,7 @@ from core.code_analysis import analyze_file
 from editors.code_editor import CodeEditor
 from studio_features import (ApiCatalogDialog, ProjectSearchDialog, TemplateWizard, ConsoleDialog, HistoryDialog, add_fade_animation)
 
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 REPOSITORY = "kisia319-cell/SkyRealm-Mod-Studio"
 LANGUAGE_EXTENSIONS = {"JavaScript": ".js", "JSON": ".json", "Python": ".py"}
 EXTENSION_LANGUAGES = {".js": "JavaScript", ".mjs": "JavaScript", ".json": "JSON", ".py": "Python"}
@@ -51,6 +51,66 @@ def project_metadata(folder: Path):
     if not isinstance(data, dict) or not data.get("name"):
         raise ValueError("Файл mod.json повреждён или в нём отсутствует название проекта.")
     return data
+
+
+class _AnalysisSignals(QObject):
+    finished = Signal(int, str, object)
+    project_finished = Signal(object)
+
+
+class _AnalysisTask(QRunnable):
+    def __init__(self, generation, path, source):
+        super().__init__()
+        self.generation = generation
+        self.path = str(path)
+        self.source = source
+        self.signals = _AnalysisSignals()
+
+    def run(self):
+        try:
+            issues = analyze_file(Path(self.path), self.source)
+        except Exception as exc:
+            issues = [(1, 1, "Ошибка анализатора", str(exc))]
+        self.signals.finished.emit(self.generation, self.path, issues)
+
+
+class _ProjectCheckTask(QRunnable):
+    EXCLUDED = {".git", "__pycache__", ".venv", "venv", ".backups", ".history", "build", "dist"}
+
+    def __init__(self, folder, extensions):
+        super().__init__()
+        self.folder = Path(folder)
+        self.extensions = set(extensions)
+        self.signals = _AnalysisSignals()
+
+    def run(self):
+        problems = []
+        try:
+            data = project_metadata(self.folder)
+            entry = (self.folder / data.get("entry", "")).resolve()
+            if self.folder.resolve() not in entry.parents:
+                problems.append("Путь главного файла выходит за пределы папки проекта.")
+            elif not entry.is_file():
+                problems.append(f"Не найден главный файл: {data.get('entry', '(не указан)')}")
+            if not data.get("id"):
+                problems.append("В mod.json отсутствует id мода.")
+            for root, dirs, files in os.walk(self.folder):
+                dirs[:] = [d for d in dirs if d not in self.EXCLUDED]
+                for filename in files:
+                    code_path = Path(root) / filename
+                    if code_path.suffix.lower() not in self.extensions:
+                        continue
+                    try:
+                        source = code_path.read_text(encoding="utf-8")
+                        problems.extend(
+                            f"{code_path.relative_to(self.folder)}:{line}:{col}: {title}: {msg}"
+                            for line, col, title, msg in analyze_file(code_path, source)
+                        )
+                    except (OSError, UnicodeError) as exc:
+                        problems.append(f"{code_path.name}: {exc}")
+        except (ValueError, OSError, json.JSONDecodeError) as exc:
+            problems.append(str(exc))
+        self.signals.project_finished.emit(problems)
 
 
 
@@ -370,12 +430,16 @@ class ProjectWindow(QMainWindow):
 
         self.autosave = QTimer(self)
         self.autosave.setSingleShot(True)
-        self.autosave.setInterval(650)
+        self.autosave.setInterval(1200)
         self.autosave.timeout.connect(self.save_file)
         self.lint_timer = QTimer(self)
         self.lint_timer.setSingleShot(True)
-        self.lint_timer.setInterval(500)
+        self.lint_timer.setInterval(1100)
         self.lint_timer.timeout.connect(self.check_current_file)
+        self._analysis_generation = 0
+        self._analysis_pool = QThreadPool(self)
+        self._analysis_pool.setMaxThreadCount(2)
+        self._project_check_running = False
         self.editor.textChanged.connect(self.on_text_changed)
         self.refresh_tree()
 
@@ -454,17 +518,27 @@ class ProjectWindow(QMainWindow):
 
     def on_text_changed(self):
         self.dirty = True
+        self._analysis_generation += 1
         self.status.setText("Есть изменения — автосохранение…")
         self.autosave.start()
         self.lint_timer.start()
 
     def save_file(self):
         self.autosave.stop()
-        if self.current_file is None:
+        if self.current_file is None or not self.dirty:
             return
         try:
+            content = self.editor.toPlainText()
+            try:
+                previous = self.current_file.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                previous = None
+            if previous == content:
+                self.dirty = False
+                self.status.setText("Сохранено")
+                return
             self.create_backup(self.current_file)
-            self.current_file.write_text(self.editor.toPlainText(), encoding="utf-8")
+            self.current_file.write_text(content, encoding="utf-8")
             self.dirty = False
             self.status.setText("Сохранено")
         except OSError as exc:
@@ -472,10 +546,24 @@ class ProjectWindow(QMainWindow):
             QMessageBox.critical(self, "Ошибка сохранения", str(exc))
 
     def check_current_file(self):
-        self.diagnostics.clear()
         if self.current_file is None:
             return
-        issues = analyze_file(self.current_file, self.editor.toPlainText())
+        self._analysis_generation += 1
+        generation = self._analysis_generation
+        path = self.current_file
+        source = self.editor.toPlainText()
+        self.diagnostics.clear()
+        self.diagnostics.addItem("Проверка в фоне…")
+        task = _AnalysisTask(generation, path, source)
+        task.signals.finished.connect(self._apply_analysis_results)
+        self._analysis_pool.start(task)
+
+    def _apply_analysis_results(self, generation, path, issues):
+        if generation != self._analysis_generation or self.current_file is None:
+            return
+        if str(self.current_file) != path:
+            return
+        self.diagnostics.clear()
         if not issues:
             self.diagnostics.addItem("✓ Ошибок синтаксиса не обнаружено")
             return
@@ -666,28 +754,17 @@ class ProjectWindow(QMainWindow):
 
     def check_project(self):
         self.save_file()
-        problems = []
-        try:
-            data = project_metadata(self.folder)
-            entry = (self.folder / data.get("entry", "")).resolve()
-            if self.folder not in entry.parents:
-                problems.append("Путь главного файла выходит за пределы папки проекта.")
-            elif not entry.is_file():
-                problems.append(f"Не найден главный файл: {data.get('entry', '(не указан)')}")
-            if not data.get("id"):
-                problems.append("В mod.json отсутствует id мода.")
-            for code_path in self.folder.rglob("*"):
-                if not code_path.is_file() or any(part in {".git", "__pycache__", ".venv", "venv"} for part in code_path.parts):
-                    continue
-                if code_path.suffix.lower() in EXTENSION_LANGUAGES:
-                    try:
-                        source = code_path.read_text(encoding="utf-8")
-                        problems.extend(f"{code_path.relative_to(self.folder)}:{line}:{col}: {title}: {msg}"
-                                        for line, col, title, msg in analyze_file(code_path, source))
-                    except (OSError, UnicodeError) as exc:
-                        problems.append(f"{code_path.name}: {exc}")
-        except (ValueError, OSError, json.JSONDecodeError) as exc:
-            problems.append(str(exc))
+        if self._project_check_running:
+            return
+        self._project_check_running = True
+        self.status.setText("Проверка проекта выполняется в фоне…")
+        task = _ProjectCheckTask(self.folder, EXTENSION_LANGUAGES)
+        task.signals.project_finished.connect(self._apply_project_check)
+        self._analysis_pool.start(task)
+
+    def _apply_project_check(self, problems):
+        self._project_check_running = False
+        self.status.setText("Проверка проекта завершена")
         if problems:
             QMessageBox.warning(self, "Проверка проекта", "Найдены проблемы:\n\n" + "\n".join(problems))
         else:

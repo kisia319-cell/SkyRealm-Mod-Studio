@@ -62,6 +62,18 @@ class VisualDesignerTests(unittest.TestCase):
             self.assertEqual(json.loads(widget.raw.toPlainText())["name"], "Gem")
             widget.close()
 
+    def test_animation_preview_starts_and_stops(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            widget = VisualDataDesigner(Path(tmp))
+            widget.kind.setCurrentText("Анимация")
+            widget.add_frame()
+            widget.frames.item(0, 0).setText("")
+            widget.frames.item(0, 1).setText("80")
+            widget.start_animation_preview()
+            self.assertTrue(widget._preview_timer.isActive())
+            widget.stop_animation_preview()
+            self.assertFalse(widget._preview_timer.isActive())
+            widget.close()
     def test_invalid_frame_values_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             widget = VisualDataDesigner(Path(tmp))

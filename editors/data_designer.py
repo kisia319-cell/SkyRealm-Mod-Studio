@@ -4,7 +4,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QTabWidget, QLabel,
@@ -104,6 +104,8 @@ class VisualDataDesigner(QWidget):
         root.addWidget(preview_panel)
         bottom = QHBoxLayout()
         load = QPushButton("Сбросить к шаблону")
+        open_data = QPushButton("Открыть JSON…")
+        open_data.clicked.connect(self.choose_data_file)
         validate = QPushButton("Проверить")
         save = QPushButton("Сохранить данные")
         save.setObjectName("primary")
@@ -111,6 +113,7 @@ class VisualDataDesigner(QWidget):
         validate.clicked.connect(self.validate_data)
         save.clicked.connect(self.save_data)
         bottom.addWidget(load)
+        bottom.addWidget(open_data)
         bottom.addStretch()
         bottom.addWidget(validate)
         bottom.addWidget(save)
@@ -121,6 +124,41 @@ class VisualDataDesigner(QWidget):
         self.list_table.itemChanged.connect(self._list_table_changed)
         self.list_field.currentTextChanged.connect(self._load_list_table)
         self.load_template(self.kind.currentText())
+
+    def choose_data_file(self):
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Открыть данные проекта", str(self.folder / "data"), "JSON (*.json)"
+        )
+        if not filename:
+            return
+        try:
+            self.load_data_file(Path(filename))
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            QMessageBox.warning(self, "Не удалось открыть данные", str(exc))
+
+    def load_data_file(self, filename):
+        path = Path(filename).resolve()
+        try:
+            path.relative_to(self.folder)
+        except ValueError as exc:
+            raise ValueError("Файл должен находиться внутри текущего проекта.") from exc
+        if not path.is_file() or path.suffix.lower() != ".json":
+            raise ValueError("Выбери существующий JSON-файл.")
+        kind = next((label for label, (directory, _template) in DATA_TYPES.items()
+                     if path.parent.name == directory), None)
+        if kind is None:
+            raise ValueError("Файл находится вне поддерживаемой папки data/.")
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("Корень JSON должен быть объектом.")
+        self.kind.blockSignals(True)
+        self.kind.setCurrentText(kind)
+        self.kind.blockSignals(False)
+        self.load_template(kind)
+        self.filename.setText(path.name)
+        self.raw.setPlainText(json.dumps(data, ensure_ascii=False, indent=2))
+        self._update_preview(data)
+        return True
 
     def _clear_form(self):
         while self.form_layout.rowCount():

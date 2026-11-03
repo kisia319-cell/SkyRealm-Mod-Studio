@@ -1,9 +1,10 @@
 """Extra productivity tools for SkyRealm Mod Studio."""
 import json
 import re
+import os
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve
+from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QTimer
 from PySide6.QtGui import QFont, QKeySequence, QAction
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
@@ -86,7 +87,11 @@ class ProjectSearchDialog(AnimatedDialog):
         layout = QVBoxLayout(self)
         self.query = QLineEdit()
         self.query.setPlaceholderText("Найти текст во всех файлах проекта…")
-        self.query.textChanged.connect(self.search)
+        self.search_timer = QTimer(self)
+        self.search_timer.setSingleShot(True)
+        self.search_timer.setInterval(300)
+        self.search_timer.timeout.connect(lambda: self.search(self.query.text()))
+        self.query.textChanged.connect(lambda _value: self.search_timer.start())
         layout.addWidget(self.query)
         self.results = QListWidget()
         self.results.itemDoubleClicked.connect(self.open_result)

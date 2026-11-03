@@ -60,39 +60,6 @@ def discover_mods(project: Path, state=None):
 def resolve_load_order(mods):
     from core.load_order import resolve_load_order as resolver
     return resolver(mods)
-    errors, warnings = [], []
-    enabled = {mod_id: mod for mod_id, mod in mods.items() if mod.get("enabled", True)}
-    for mod_id, mod in enabled.items():
-        for dependency in sorted(mod["dependencies"]):
-            if dependency not in mods:
-                errors.append(f"{mod_id}: отсутствует обязательная зависимость {dependency}.")
-            elif dependency not in enabled:
-                errors.append(f"{mod_id}: зависимость {dependency} отключена.")
-        for conflict in sorted(mod["conflicts"]):
-            if conflict in enabled and conflict != mod_id:
-                errors.append(f"{mod_id}: конфликтует с включённым модом {conflict}.")
-
-    order, visiting, visited = [], set(), set()
-
-    def visit(mod_id):
-        if mod_id in visited:
-            return
-        if mod_id in visiting:
-            errors.append(f"Обнаружен цикл зависимостей около мода {mod_id}.")
-            return
-        visiting.add(mod_id)
-        for dependency in sorted(enabled[mod_id]["dependencies"]):
-            if dependency in enabled:
-                visit(dependency)
-        visiting.remove(mod_id)
-        visited.add(mod_id)
-        order.append(mod_id)
-
-    for mod_id in sorted(enabled):
-        visit(mod_id)
-    if errors:
-        return [], list(dict.fromkeys(errors)), warnings
-    return order, errors, warnings
 
 
 def export_load_order(project: Path, mods, order):

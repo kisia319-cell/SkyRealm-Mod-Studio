@@ -43,6 +43,18 @@ with tempfile.TemporaryDirectory() as tmp:
         time.sleep(0.02)
     assert js.read_text(encoding="utf-8") == "const updated = 42;"
     assert not win.dirty
+    backup = win.backup_path_for(js)
+    assert backup.is_file()
+    assert "const ok = true" in backup.read_text(encoding="utf-8")
+    from PySide6.QtWidgets import QMessageBox
+    original_question = QMessageBox.question
+    QMessageBox.question = lambda *args, **kwargs: QMessageBox.StandardButton.Yes
+    try:
+        js.write_text("const damaged = ;", encoding="utf-8")
+        win.restore_backup()
+    finally:
+        QMessageBox.question = original_question
+    assert "const ok = true" in js.read_text(encoding="utf-8")
     win.close()
     home.close()
 

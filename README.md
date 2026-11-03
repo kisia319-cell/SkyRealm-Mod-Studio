@@ -15,6 +15,10 @@ Windows desktop editor for SkyRealm mod projects.
 - First-launch choice to view the course or skip it. The course remains available from the home screen and the editor's Help button.
 - GitHub Releases update check. When a newer release is found, the app asks whether to download and install it. The EXE is validated, replaced after the app exits, and the previous executable is retained as a backup.
 
+## Productivity tools
+
+The API catalog documents only a limited host surface and warns that game-runtime support is version-dependent. Generated item, weapon, mob, and ability files are educational data templates; they do not create working game entities unless the corresponding API is implemented by SkyRealm. The built-in log displays Studio/project status and does not execute shell commands or mod code.
+
 ## Languages and compatibility
 
 JavaScript is the current scripting language used by Mod Studio. JSON stores metadata and data. Python can be edited and syntax-checked, but running Python mods inside SkyRealm is not supported by this statement. A successful syntax check does not grant code access to the game: actual gameplay features require a documented API supported by the matching SkyRealm runtime.

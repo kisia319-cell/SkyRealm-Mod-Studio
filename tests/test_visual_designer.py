@@ -46,6 +46,22 @@ class VisualDesignerTests(unittest.TestCase):
             self.assertEqual(data["frames"][0]["durationMs"], 120)
             widget.close()
 
+    def test_load_existing_json_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root / "data" / "items"
+            folder.mkdir(parents=True)
+            source = folder / "gem.json"
+            source.write_text(json.dumps({
+                "id": "demo:gem", "name": "Gem", "description": "",
+                "stackSize": 5, "rarity": "rare", "sprite": ""
+            }), encoding="utf-8")
+            widget = VisualDataDesigner(root)
+            self.assertTrue(widget.load_data_file(source))
+            self.assertEqual(widget.filename.text(), "gem.json")
+            self.assertEqual(json.loads(widget.raw.toPlainText())["name"], "Gem")
+            widget.close()
+
     def test_invalid_frame_values_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             widget = VisualDataDesigner(Path(tmp))

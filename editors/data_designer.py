@@ -429,6 +429,9 @@ class VisualDataDesigner(QWidget):
         row = self._animation_preview_index
         sprite_item = self.frames.item(row, 0)
         sprite = sprite_item.text().strip() if sprite_item else ""
+        if not sprite:
+            self.preview_image.setPixmap(QPixmap())
+            self.preview_image.setText("Кадр без спрайта")
         if sprite:
             image_path = (self.folder / sprite).resolve()
             try:
@@ -455,7 +458,7 @@ class VisualDataDesigner(QWidget):
         self._animation_preview_index += 1
         if self._animation_preview_index >= self.frames.rowCount():
             try:
-                loop = bool(json.loads(self.raw.toPlainText()).get("loop", False))
+                loop = json.loads(self.raw.toPlainText()).get("loop", False) is True
             except (ValueError, AttributeError):
                 loop = False
             if not loop:

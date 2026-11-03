@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QListWidget, QTabWidget, QPlainTextEdit, QInputDialog, QScrollArea
 )
 
-from core.code_analysis import analyze_file
+from core.code_analysis import analyze_file\nfrom core.project_validation import validate_project
 from editors.code_editor import CodeEditor
 from studio_features import (ApiCatalogDialog, ProjectSearchDialog, TemplateWizard, ConsoleDialog, HistoryDialog, add_fade_animation)
 from advanced_tools import AdvancedToolsDialog
@@ -87,14 +87,9 @@ class _ProjectCheckTask(QRunnable):
     def run(self):
         problems = []
         try:
-            data = project_metadata(self.folder)
-            entry = (self.folder / data.get("entry", "")).resolve()
-            if self.folder.resolve() not in entry.parents:
-                problems.append("Путь главного файла выходит за пределы папки проекта.")
-            elif not entry.is_file():
-                problems.append(f"Не найден главный файл: {data.get('entry', '(не указан)')}")
-            if not data.get("id"):
-                problems.append("В mod.json отсутствует id мода.")
+            manifest_errors, manifest_warnings = validate_project(self.folder)
+            problems.extend(f"ERROR: {message}" for message in manifest_errors)
+            problems.extend(f"WARNING: {message}" for message in manifest_warnings)
             for root, dirs, files in os.walk(self.folder):
                 dirs[:] = [d for d in dirs if d not in self.EXCLUDED]
                 for filename in files:

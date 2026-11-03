@@ -256,18 +256,28 @@ class AdvancedToolsDialog(QDialog):
     def _build_mod_manager(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.addWidget(QLabel("Локальный каталог подпроектов в папке mods/. Флажки сохраняются в .studio-mods.json и сами по себе не включают моды в игре."))
+        layout.addWidget(QLabel("Каталог подпроектов mods/. Состояния включения хранятся локально; экспорт порядка загрузки создаёт mods.loadorder.json для возможного подключения игровым runtime."))
         self.mod_list = QListWidget()
         self.mod_list.itemChanged.connect(self._save_mod_states)
         layout.addWidget(self.mod_list, 1)
+        self.mod_report = QPlainTextEdit()
+        self.mod_report.setReadOnly(True)
+        self.mod_report.setMaximumHeight(150)
+        layout.addWidget(self.mod_report)
         row = QHBoxLayout()
         refresh = QPushButton("Обновить список")
         refresh.clicked.connect(self._refresh_mods)
-        open_folder = QPushButton("Открыть папку проекта")
+        check = QPushButton("Проверить зависимости")
+        check.clicked.connect(self._check_load_order)
+        export = QPushButton("Экспортировать порядок загрузки")
+        export.clicked.connect(self._export_load_order)
+        open_folder = QPushButton("Открыть папку")
         open_folder.clicked.connect(lambda: self._open_path(self.folder / "mods"))
         row.addWidget(refresh)
-        row.addWidget(open_folder)
+        row.addWidget(check)
+        row.addWidget(export)
         row.addStretch()
+        row.addWidget(open_folder)
         layout.addLayout(row)
         return page
 
@@ -275,7 +285,6 @@ class AdvancedToolsDialog(QDialog):
         if not hasattr(self, "mod_list"):
             return
         self.mod_list.clear()
-        root = self.folder / "mods"
         state_path = self.folder / ".studio-mods.json"
         try:
             state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
@@ -283,24 +292,62 @@ class AdvancedToolsDialog(QDialog):
             state = {}
         if not isinstance(state, dict):
             state = {}
-        if not root.is_dir():
-            self.mod_list.addItem("Папка mods/ пока отсутствует.")
+        mods, errors, warnings = discover_mods(self.folder, state)
+        if not hasattr(self, "mod_report"):
             return
-        for manifest in sorted(root.glob("*/mod.json")):
-            try:
-                meta = json.loads(manifest.read_text(encoding="utf-8"))
-                if not isinstance(meta, dict):
-                    raise ValueError("manifest должен быть JSON-объектом")
-                mod_id = meta.get("id") if isinstance(meta.get("id"), str) else manifest.parent.name
-                mod_name = meta.get("name") if isinstance(meta.get("name"), str) else manifest.parent.name
-                version = meta.get("version") if isinstance(meta.get("version"), str) else "?"
-                item = QListWidgetItem(f"{mod_name}  —  {version}  [{mod_id}]")
-                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                item.setCheckState(Qt.CheckState.Checked if state.get(mod_id, True) else Qt.CheckState.Unchecked)
-                item.setData(Qt.ItemDataRole.UserRole, mod_id)
-                self.mod_list.addItem(item)
-            except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
-                self.mod_list.addItem(f"Повреждён manifest: {manifest}")
+        if not mods:
+            self.mod_list.addItem("Подпроектов с корректным mod.json пока нет.")
+        for mod_id, meta in sorted(mods.items()):
+            item = QListWidgetItem(f"{meta['name']} — {meta['version']} [{mod_id}]")
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked if meta["enabled"] else Qt.CheckState.Unchecked)
+            item.setData(Qt.ItemDataRole.UserRole, mod_id)
+            self.mod_list.addItem(item)
+        self._resolved_mods = mods
+        self._resolved_order = []
+        self._load_order_errors = errors
+        self._load_order_warnings = warnings
+        lines = [f"Найдено модов: {len(mods)}"]
+        lines.extend("ERROR: " + value for value in errors)
+        lines.extend("WARNING: " + value for value in warnings)
+        self.mod_report.setPlainText("\n".join(lines) if len(lines) > 1 else lines[0])
+
+    def _check_load_order(self):
+        state = {}
+        for index in range(self.mod_list.count()):
+            item = self.mod_list.item(index)
+            mod_id = item.data(Qt.ItemDataRole.UserRole)
+            if mod_id:
+                state[mod_id] = item.checkState() == Qt.CheckState.Checked
+        mods, errors, warnings = discover_mods(self.folder, state)
+        order, resolve_errors, resolve_warnings = resolve_load_order(mods)
+        errors.extend(resolve_errors)
+        warnings.extend(resolve_warnings)
+        self._resolved_mods = mods
+        self._resolved_order = order
+        self._load_order_errors = list(dict.fromkeys(errors))
+        self._load_order_warnings = list(dict.fromkeys(warnings))
+        enabled_count = sum(1 for mod in mods.values() if mod["enabled"])
+        lines = [f"Найдено модов: {len(mods)}", f"Включено: {enabled_count}"]
+        lines.extend("ERROR: " + value for value in self._load_order_errors)
+        lines.extend("WARNING: " + value for value in self._load_order_warnings)
+        if not self._load_order_errors:
+            lines.append("Порядок загрузки:")
+            lines.extend(f"{index + 1}. {mod_id}" for index, mod_id in enumerate(order))
+        lines.append("Экспорт создаёт конфигурацию. Игра начнёт применять её только после реализации поддержки в runtime.")
+        self.mod_report.setPlainText("\n".join(lines))
+        return not self._load_order_errors
+
+    def _export_load_order(self):
+        if not self._check_load_order():
+            QMessageBox.warning(self, "Нельзя экспортировать", "Исправь зависимости, конфликты и циклы перед экспортом.")
+            return
+        try:
+            target = export_load_order(self.folder, self._resolved_mods, self._resolved_order)
+            QMessageBox.information(self, "Порядок загрузки сохранён", f"Создан файл:\n{target}")
+            logging.info("Exported mod load order with %s entries", len(self._resolved_order))
+        except (OSError, ValueError) as exc:
+            QMessageBox.critical(self, "Ошибка экспорта", str(exc))
 
     def _save_mod_states(self, _item=None):
         state = {}

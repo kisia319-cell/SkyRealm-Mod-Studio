@@ -20,6 +20,8 @@ def validate_manifest(folder: Path):
     root = Path(folder).resolve()
     errors, warnings = [], []
     manifest = root / "mod.json"
+    if manifest.is_symlink():
+        return {}, ["mod.json не должен быть символической ссылкой."], warnings
     try:
         data = json.loads(manifest.read_text(encoding="utf-8"))
     except FileNotFoundError:

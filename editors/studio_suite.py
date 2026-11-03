@@ -10,7 +10,7 @@ import re
 import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QFileSystemWatcher, QTimer
+from PySide6.QtCore import Qt, QFileSystemWatcher, QTimer, QThreadPool, QRunnable, QObject, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QPushButton,
@@ -45,6 +45,47 @@ def _atomic_json(path, data):
             temp.unlink()
 
 
+class _SuiteSignals(QObject):
+    finished = Signal(int, list, int)
+
+
+class _StaticTestTask(QRunnable):
+    def __init__(self, generation, root):
+        super().__init__()
+        self.generation = generation
+        self.root = Path(root)
+        self.signals = _SuiteSignals()
+
+    def run(self):
+        checked, issues = 0, []
+        for base, dirs, files in os.walk(self.root, followlinks=False):
+            current = Path(base)
+            dirs[:] = [d for d in dirs if d not in EXCLUDED and not (current / d).is_symlink()]
+            for name in files:
+                path = current / name
+                if path.is_symlink() or path.suffix.lower() not in {".json", ".py", ".js", ".mjs", ".cjs"}:
+                    continue
+                try:
+                    source = path.read_text(encoding="utf-8")
+                    checked += 1
+                    rel = path.relative_to(self.root)
+                    if path.suffix.lower() == ".json":
+                        try:
+                            json.loads(source)
+                        except json.JSONDecodeError as exc:
+                            issues.append(f"{rel}:{exc.lineno}:{exc.colno}: JSON: {exc.msg}")
+                    elif path.suffix.lower() == ".py":
+                        try:
+                            ast.parse(source, filename=str(rel))
+                        except SyntaxError as exc:
+                            issues.append(f"{rel}:{exc.lineno}: Python: {exc.msg}")
+                    elif source.count("{") != source.count("}"):
+                        issues.append(f"{rel}: возможно, не совпадает число фигурных скобок")
+                except (OSError, UnicodeError) as exc:
+                    issues.append(f"{path.name}: {exc}")
+        self.signals.finished.emit(self.generation, issues, checked)
+
+
 class StudioSuiteWidget(QWidget):
     """A lazy, project-scoped toolbox for authoring and validating mod assets."""
     def __init__(self, project_folder, parent=None):
@@ -57,6 +98,9 @@ class StudioSuiteWidget(QWidget):
         self._watch_refresh.setSingleShot(True)
         self._watch_refresh.setInterval(250)
         self._watch_refresh.timeout.connect(self._refresh_watched_paths)
+        self.test_pool = QThreadPool(self)
+        self.test_pool.setMaxThreadCount(1)
+        self._test_generation = 0
 
         layout = QVBoxLayout(self)
         intro = QLabel(
@@ -251,41 +295,29 @@ class StudioSuiteWidget(QWidget):
         self.test_output = QPlainTextEdit()
         self.test_output.setReadOnly(True)
         layout.addWidget(self.test_output, 1)
-        run = QPushButton("Запустить статические тесты")
-        run.clicked.connect(self._run_static_tests)
-        layout.addWidget(run)
+        self.test_button = QPushButton("Запустить статические тесты")
+        self.test_button.clicked.connect(self._run_static_tests)
+        layout.addWidget(self.test_button)
         return page
 
     def _run_static_tests(self):
-        checked, issues = 0, []
-        for base, dirs, files in os.walk(self.root, followlinks=False):
-            current = Path(base)
-            dirs[:] = [d for d in dirs if d not in EXCLUDED and not (current / d).is_symlink()]
-            for name in files:
-                path = current / name
-                if path.is_symlink() or path.suffix.lower() not in {".json", ".py", ".js", ".mjs", ".cjs"}:
-                    continue
-                try:
-                    source = path.read_text(encoding="utf-8")
-                    checked += 1
-                    rel = path.relative_to(self.root)
-                    if path.suffix.lower() == ".json":
-                        try:
-                            json.loads(source)
-                        except json.JSONDecodeError as exc:
-                            issues.append(f"{rel}:{exc.lineno}:{exc.colno}: JSON: {exc.msg}")
-                    elif path.suffix.lower() == ".py":
-                        try:
-                            ast.parse(source, filename=str(rel))
-                        except SyntaxError as exc:
-                            issues.append(f"{rel}:{exc.lineno}: Python: {exc.msg}")
-                    else:
-                        if source.count("{") != source.count("}"):
-                            issues.append(f"{rel}: возможно, не совпадает число фигурных скобок")
-                except (OSError, UnicodeError) as exc:
-                    issues.append(f"{path.name}: {exc}")
-        self.test_output.setPlainText(f"Проверено файлов: {checked}\nНайдено замечаний: {len(issues)}\n\n" + ("\n".join(issues) if issues else "Статические проверки пройдены. Это не заменяет запуск в игре."))
-    
+        self._test_generation += 1
+        generation = self._test_generation
+        self.test_button.setEnabled(False)
+        self.test_output.setPlainText("Статические проверки выполняются в фоновом потоке…")
+        task = _StaticTestTask(generation, self.root)
+        task.signals.finished.connect(self._apply_static_test_results)
+        self.test_pool.start(task)
+
+    def _apply_static_test_results(self, generation, issues, checked):
+        if generation != self._test_generation:
+            return
+        self.test_button.setEnabled(True)
+        self.test_output.setPlainText(
+            f"Проверено файлов: {checked}\\nНайдено замечаний: {len(issues)}\\n\\n"
+            + ("\\n".join(issues) if issues else "Статические проверки пройдены. Это не заменяет запуск в игре.")
+        )
+
     def _dependency_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -526,6 +558,9 @@ class StudioSuiteWidget(QWidget):
 
     def _search_api_docs(self, query):
         terms = query.casefold().strip()
+        if not terms:
+            self.api_output.setPlainText("Введи название функции, события или ключевое слово для поиска в документации проекта.")
+            return
         results = []
         for base, dirs, files in os.walk(self.root, followlinks=False):
             current = Path(base)

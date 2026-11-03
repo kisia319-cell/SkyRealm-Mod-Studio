@@ -12,7 +12,8 @@ Windows desktop editor for SkyRealm mod projects.
 - Automatic save and syntax diagnostics for JavaScript (Node.js), Python (AST), and JSON.
 - Click a diagnostic to jump to its line.
 - Basic safe formatting (JSON pretty-printing; whitespace cleanup for JS/Python).
-- Project syntax check and ZIP export of source files.
+- Project syntax check, ZIP export of source files, and one-step backup/restore for edited files.
+- Built-in help for the editor and supported languages.
 - GitHub Releases update check and one-file EXE replacement on Windows.
 
 ## Languages

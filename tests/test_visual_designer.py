@@ -22,6 +22,18 @@ class VisualDesignerTests(unittest.TestCase):
             self.assertEqual(data["name"], "Crystal")
             widget.close()
 
+    def test_form_keeps_unknown_custom_json_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            widget = VisualDataDesigner(Path(tmp))
+            data = json.loads(widget.raw.toPlainText())
+            data["customRuntimeFlag"] = True
+            widget.raw.setPlainText(json.dumps(data))
+            widget._controls["name"].setText("Edited")
+            saved = json.loads(widget.raw.toPlainText())
+            self.assertTrue(saved["customRuntimeFlag"])
+            self.assertEqual(saved["name"], "Edited")
+            widget.close()
+
     def test_animation_frames_round_trip(self):
         with tempfile.TemporaryDirectory() as tmp:
             widget = VisualDataDesigner(Path(tmp))

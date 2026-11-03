@@ -107,27 +107,28 @@ class ProjectSearchDialog(AnimatedDialog):
             self.hint.setText("Введи минимум 2 символа.")
             return
         count = 0
-        ignored = {".git", "__pycache__", ".venv", "venv", ".backups", ".history", "build", "dist"}
-        for path in self.folder.rglob("*"):
-            if not path.is_file() or any(part in ignored for part in path.relative_to(self.folder).parts):
-                continue
-            if path.suffix.lower() not in {".js", ".mjs", ".json", ".py", ".md", ".txt"}:
-                continue
-            try:
-                lines = path.read_text(encoding="utf-8").splitlines()
-            except (OSError, UnicodeError):
-                continue
-            for number, line in enumerate(lines, 1):
-                if needle in line.casefold():
-                    item = QListWidgetItem(f"{path.relative_to(self.folder)}  •  строка {number}: {line.strip()[:180]}")
-                    item.setData(Qt.ItemDataRole.UserRole, (str(path), number))
-                    self.results.addItem(item)
-                    count += 1
-                    if count >= 500:
-                        self.hint.setText("Показаны первые 500 совпадений.")
-                        return
+        ignored = {".git", "__pycache__", ".venv", "venv", ".backups", ".history", "build", "dist", "node_modules"}
+        allowed = {".js", ".mjs", ".json", ".py", ".md", ".txt"}
+        for root, dirs, files in os.walk(self.folder):
+            dirs[:] = sorted(d for d in dirs if d not in ignored)
+            for filename in sorted(files):
+                path = Path(root) / filename
+                if path.suffix.lower() not in allowed:
+                    continue
+                try:
+                    lines = path.read_text(encoding="utf-8").splitlines()
+                except (OSError, UnicodeError):
+                    continue
+                for number, line in enumerate(lines, 1):
+                    if needle in line.casefold():
+                        item = QListWidgetItem(f"{path.relative_to(self.folder)}  •  строка {number}: {line.strip()[:180]}")
+                        item.setData(Qt.ItemDataRole.UserRole, (str(path), number))
+                        self.results.addItem(item)
+                        count += 1
+                        if count >= 500:
+                            self.hint.setText("Показаны первые 500 совпадений.")
+                            return
         self.hint.setText(f"Найдено совпадений: {count}")
-
     def open_result(self, item):
         path, line = item.data(Qt.ItemDataRole.UserRole)
         self.open_callback(Path(path), line)

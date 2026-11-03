@@ -41,7 +41,7 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
           SKYREALM_STUDIO_TEST: "1"
-        run: python tests/test_studio_core.py
+        run: python tests/test_studio_core.py\n          python tests/test_project_validation.py
       - name: Build standalone executable
         run: pyinstaller --noconfirm --clean --onefile --windowed --name SkyRealmModStudio main.py
       - name: Upload build artifact

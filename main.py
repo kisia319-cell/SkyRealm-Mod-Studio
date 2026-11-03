@@ -368,9 +368,11 @@ class ProjectWindow(QMainWindow):
         if not destination:
             return
         try:
-            with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
+            destination_path = Path(destination).resolve()
+            with zipfile.ZipFile(destination_path, "w", zipfile.ZIP_DEFLATED) as archive:
                 for path in self.folder.rglob("*"):
-                    if path.is_file() and not any(part in {".git", "__pycache__", ".venv", "venv"} for part in path.parts):
+                    if (path.is_file() and path.resolve() != destination_path
+                            and not any(part in {".git", "__pycache__", ".venv", "venv"} for part in path.parts)):
                         archive.write(path, path.relative_to(self.folder))
             QMessageBox.information(self, "Экспорт завершён",
                 f"ZIP-архив исходников создан:\n{destination}\n\nЭто архив проекта, а не гарантированно совместимый установщик игры.")
@@ -475,7 +477,11 @@ class ProjectWindow(QMainWindow):
         if path.exists():
             QMessageBox.warning(self, "Файл существует", "Файл с таким именем уже существует.")
             return
-        path.write_text("", encoding="utf-8")
+        try:
+            path.write_text("", encoding="utf-8")
+        except OSError as exc:
+            QMessageBox.critical(self, "Ошибка создания файла", str(exc))
+            return
         self.refresh_tree()
         items = self.tree.findItems(name, Qt.MatchFlag.MatchRecursive | Qt.MatchFlag.MatchExactly, 0)
         if items:

@@ -24,6 +24,7 @@ Open **Все инструменты** in a project to access:
 - **Compatibility check:** compares explicitly declared `gameVersion`, `minGameVersion` and `maxGameVersion` against a selected game version; it cannot certify runtime APIs.
 - **Local mod manager:** discovers subprojects in `mods/*/mod.json`, stores enable flags, resolves dependency order using an iterative graph algorithm (including large dependency chains), detects disabled/missing dependencies, conflicts and cycles, and exports `mods.loadorder.json`. The game must implement a loader for this file before it affects runtime.
 - **ZIP packager:** validates project metadata and dependencies, uses one shared atomic archive builder for both project export and mod packaging, skips symlinks and private/history folders, then verifies the resulting ZIP.
+- **Центр публикации:** проверяет манифест, зависимости и заявленную версию SkyRealm; собирает ZIP релиза, JSON-манифест и SHA-256. Не публикует мод автоматически и не подтверждает работу мода в игре.
 - **Git viewer:** reads repository status and recent commits without performing destructive Git operations.
 - **Live Studio logs:** displays log records emitted by Studio tools. It is not connected to the game's runtime logs.
 

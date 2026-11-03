@@ -44,17 +44,7 @@ QLabel#status { color: #68dfa5; padding: 5px; }
 """
 
 
-STARTER_CODE = """// SkyRealm Mod Studio — точка входа мода
-// Функция вызывается игровым runtime мода.
-// Доступный контекст зависит от версии API игры.
-
-function onTick(context) {
-    // Пример:
-    // if (context.health < 30) {
-    //     return { type: "message", text: "Нужно восстановить здоровье!" };
-    // }
-}
-"""
+STARTER_CODE = ""
 
 
 class CreateModDialog(QDialog):
@@ -110,6 +100,89 @@ class CreateModDialog(QDialog):
 
     def values(self):
         return self.name_input.text().strip(), self.folder_input.text().strip()
+
+
+
+class CodeEditorWindow(QMainWindow):
+    def __init__(self, script_path: Path, parent=None):
+        super().__init__(parent)
+        self.script_path = script_path
+        self.setWindowTitle(f"Редактор кода — {script_path.parent.parent.name}")
+        self.resize(1050, 720)
+        self.setMinimumSize(760, 500)
+        self.setStyleSheet(STYLE)
+
+        central = QWidget()
+        layout = QVBoxLayout(central)
+        layout.setContentsMargins(22, 18, 22, 18)
+        layout.setSpacing(12)
+
+        header = QHBoxLayout()
+        title_box = QVBoxLayout()
+        title = QLabel("РЕДАКТОР КОДА")
+        title.setObjectName("eyebrow")
+        subtitle = QLabel("scripts/main.js")
+        subtitle.setFont(QFont("Segoe UI", 17, QFont.Weight.Bold))
+        title_box.addWidget(title)
+        title_box.addWidget(subtitle)
+        header.addLayout(title_box, 1)
+        self.language_label = QLabel("Язык: JavaScript")
+        self.language_label.setObjectName("status")
+        header.addWidget(self.language_label)
+        save = QPushButton("Сохранить")
+        save.setObjectName("save")
+        save.clicked.connect(self.save_code)
+        header.addWidget(save)
+        layout.addLayout(header)
+
+        # Кодовая область намеренно пустая: никаких приветствий и шаблонного текста.
+        self.editor = QPlainTextEdit()
+        self.editor.setObjectName("codeArea")
+        self.editor.setFont(QFont("Consolas", 12))
+        self.editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self.editor.setTabStopDistance(4 * self.editor.fontMetrics().horizontalAdvance(" "))
+        self.editor.setPlainText(self.script_path.read_text(encoding="utf-8") if self.script_path.exists() else "")
+        layout.addWidget(self.editor, 1)
+
+        footer = QHBoxLayout()
+        self.status = QLabel("Готово")
+        self.status.setObjectName("muted")
+        footer.addWidget(self.status)
+        footer.addStretch(1)
+        close = QPushButton("Закрыть")
+        close.setObjectName("secondary")
+        close.clicked.connect(self.close)
+        footer.addWidget(close)
+        layout.addLayout(footer)
+        self.setCentralWidget(central)
+        self.editor.textChanged.connect(lambda: self.status.setText("Есть несохранённые изменения"))
+
+    def save_code(self):
+        try:
+            self.script_path.parent.mkdir(parents=True, exist_ok=True)
+            self.script_path.write_text(self.editor.toPlainText(), encoding="utf-8")
+            self.status.setText("Сохранено")
+        except OSError as error:
+            QMessageBox.critical(self, "Ошибка сохранения", str(error))
+
+    def closeEvent(self, event):
+        if self.status.text() == "Есть несохранённые изменения":
+            answer = QMessageBox.question(
+                self, "Несохранённый код",
+                "Сохранить изменения перед закрытием?",
+                QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard |
+                QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Save
+            )
+            if answer == QMessageBox.StandardButton.Cancel:
+                event.ignore()
+                return
+            if answer == QMessageBox.StandardButton.Save:
+                self.save_code()
+                if self.status.text() == "Есть несохранённые изменения":
+                    event.ignore()
+                    return
+        event.accept()
 
 
 class ModEditorWindow(QMainWindow):
@@ -184,40 +257,28 @@ class ModEditorWindow(QMainWindow):
         overview_layout.addStretch(1)
         self.tabs.addTab(overview, "Обзор проекта")
 
-        code_page = QWidget()
-        code_layout = QVBoxLayout(code_page)
-        code_layout.setContentsMargins(14, 14, 14, 14)
-        code_layout.setSpacing(10)
-        code_header = QHBoxLayout()
-        code_title = QLabel("Файлы проекта")
-        code_title.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
-        self.current_file_label = QLabel("scripts/main.js")
-        self.current_file_label.setObjectName("muted")
-        code_header.addWidget(code_title)
-        code_header.addStretch(1)
-        code_header.addWidget(self.current_file_label)
-        code_layout.addLayout(code_header)
-
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.file_list = QListWidget()
-        self.file_list.addItem(QListWidgetItem("📄  scripts/main.js"))
-        self.file_list.addItem(QListWidgetItem("📄  mod.json"))
-        self.file_list.addItem(QListWidgetItem("📄  README.md"))
-        self.file_list.setCurrentRow(0)
-        splitter.addWidget(self.file_list)
-        self.code_editor = QPlainTextEdit()
-        self.code_editor.setFont(QFont("Consolas", 11))
-        self.code_editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        self.script_buffer = self.script_path.read_text(encoding="utf-8")
-        self.code_editor.setPlainText(self.script_buffer)
-        splitter.addWidget(self.code_editor)
-        splitter.setSizes([210, 760])
-        code_layout.addWidget(splitter, 1)
-        code_hint = QLabel("Сейчас редактируется JavaScript-файл scripts/main.js. Сохранение записывает код на диск.")
-        code_hint.setObjectName("muted")
-        code_layout.addWidget(code_hint)
-        self.file_list.currentRowChanged.connect(self.select_file)
-        self.tabs.addTab(code_page, "Редактор кода")
+        files_page = QWidget()
+        files_layout = QVBoxLayout(files_page)
+        files_layout.setContentsMargins(22, 22, 22, 22)
+        files_layout.setSpacing(14)
+        files_title = QLabel("Файлы проекта")
+        files_title.setFont(QFont("Segoe UI", 17, QFont.Weight.Bold))
+        files_hint = QLabel("Редактор кода открывается в отдельном окне. Основное окно проекта остаётся независимым.")
+        files_hint.setObjectName("muted")
+        files_layout.addWidget(files_title)
+        files_layout.addWidget(files_hint)
+        file_list = QListWidget()
+        file_list.addItem("📄  scripts/main.js  — JavaScript")
+        file_list.addItem("📄  mod.json  — параметры мода")
+        file_list.addItem("📄  README.md  — описание проекта")
+        file_list.setMaximumHeight(170)
+        files_layout.addWidget(file_list)
+        open_code = QPushButton("Открыть отдельный редактор кода")
+        open_code.setObjectName("primary")
+        open_code.clicked.connect(self.open_code_editor)
+        files_layout.addWidget(open_code, alignment=Qt.AlignmentFlag.AlignLeft)
+        files_layout.addStretch(1)
+        self.tabs.addTab(files_page, "Файлы проекта")
         root.addWidget(self.tabs, 1)
 
         footer = QHBoxLayout()
@@ -232,33 +293,18 @@ class ModEditorWindow(QMainWindow):
         root.addLayout(footer)
         self.setCentralWidget(central)
 
-        self.current_file = "script"
-        self.code_editor.textChanged.connect(self.mark_dirty)
         self.name_field.textChanged.connect(self.mark_dirty)
         self.version_field.textChanged.connect(self.mark_dirty)
         self.author_field.textChanged.connect(self.mark_dirty)
         self.description_field.textChanged.connect(self.mark_dirty)
+        self.code_editor_window = None
 
-    def select_file(self, row):
-        if getattr(self, "current_file", None) == "script":
-            self.script_buffer = self.code_editor.toPlainText()
-        if row == 0:
-            self.current_file = "script"
-            self.current_file_label.setText("scripts/main.js")
-            self.code_editor.setReadOnly(False)
-            self.code_editor.setPlainText(self.script_buffer)
-        elif row == 1:
-            self.current_file = "metadata"
-            self.current_file_label.setText("mod.json (просмотр)")
-            self.code_editor.setReadOnly(True)
-            self.code_editor.setPlainText(self.metadata_path.read_text(encoding="utf-8"))
-        elif row == 2:
-            self.current_file = "readme"
-            self.current_file_label.setText("README.md (просмотр)")
-            self.code_editor.setReadOnly(True)
-            readme = self.project_dir / "README.md"
-            self.code_editor.setPlainText(readme.read_text(encoding="utf-8") if readme.exists() else "")
-        self.mark_dirty()
+    def open_code_editor(self):
+        if self.code_editor_window is None or not self.code_editor_window.isVisible():
+            self.code_editor_window = CodeEditorWindow(self.script_path, self)
+        self.code_editor_window.show()
+        self.code_editor_window.raise_()
+        self.code_editor_window.activateWindow()
 
     def mark_dirty(self, *_):
         self.status.setText("Есть несохранённые изменения")
@@ -276,9 +322,6 @@ class ModEditorWindow(QMainWindow):
                 QMessageBox.warning(self, "Не заполнено название", "Укажи название мода.")
                 return
             self.metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=4), encoding="utf-8")
-            if self.current_file == "script":
-                self.script_buffer = self.code_editor.toPlainText()
-            self.script_path.write_text(self.script_buffer, encoding="utf-8")
             self.project_title.setText(metadata["name"])
             self.setWindowTitle(f"SkyRealm Mod Studio — {metadata['name']}")
             self.status.setText("Сохранено")
@@ -405,7 +448,7 @@ class StudioWindow(QMainWindow):
                 "description": ""
             }
             (project_dir / "mod.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=4), encoding="utf-8")
-            (project_dir / "scripts" / "main.js").write_text(STARTER_CODE, encoding="utf-8")
+            (project_dir / "scripts" / "main.js").write_text("", encoding="utf-8")
             (project_dir / "README.md").write_text(
                 f"# {mod_name}\n\nМодификация для игры SkyRealm.\n", encoding="utf-8"
             )

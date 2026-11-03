@@ -44,7 +44,8 @@ jobs:
           SKYREALM_STUDIO_TEST: "1"
         run: |
           python tests/test_studio_core.py
-          python tests/test_project_validation.py\n          python tests/test_smart_analysis.py
+          python tests/test_project_validation.py
+          python tests/test_smart_analysis.py
       - name: Build standalone executable
         run: pyinstaller --noconfirm --clean --onefile --windowed --name SkyRealmModStudio main.py
       - name: Upload build artifact

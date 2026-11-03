@@ -16,6 +16,7 @@ from pathlib import Path
 from core.smart_analysis import scan_javascript
 from core.project_validation import validate_manifest, validate_project
 from core.compatibility import check_compatibility
+from core.mod_manager import discover_mods, resolve_load_order, export_load_order
 from editors.data_designer import VisualDataDesigner
 from editors.debugger_tools import NodeDebuggerWidget
 

@@ -3,6 +3,7 @@ import json
 import queue
 import re
 import threading
+import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QProcess, QThread, Signal
@@ -39,8 +40,7 @@ class InspectorWorker(QThread):
         self._next_id = 1
 
     def command(self, method, params=None):
-        self.commands.put({"id": self._next_id, "method": method, "params": params or {}})
-        self._next_id += 1
+        self.commands.put({"method": method, "params": params or {}})
 
     def stop(self):
         self.stopping.set()
@@ -70,7 +70,7 @@ class InspectorWorker(QThread):
                 try:
                     while True:
                         command = self.commands.get_nowait()
-                        socket.send(json.dumps(command))
+                        send(command["method"], command.get("params"))
                 except queue.Empty:
                     pass
                 try:
@@ -141,6 +141,9 @@ class NodeDebuggerWidget(QWidget):
         self.profiler_process.errorOccurred.connect(self._process_error)
         self.worker = None
         self._inspector_url_seen = False
+        self._processing_profile = False
+        self._profile_started_at = 0.0
+        self._profile_log_path = None
 
         root = QVBoxLayout(self)
         warning = QLabel("ВНИМАНИЕ: отладчик и профилировщик реально запускают выбранный JavaScript-файл через Node.js с правами текущего пользователя. Запускай только код, которому доверяешь. Это не песочница.")
@@ -293,6 +296,9 @@ class NodeDebuggerWidget(QWidget):
             QMessageBox.warning(self, "Файл не выбран", "Выбери существующий JavaScript-файл.")
             return
         self._append(f"Профилирование: {path.relative_to(self.folder)}")
+        self._processing_profile = False
+        self._profile_started_at = time.time()
+        self._profile_log_path = None
         self.profiler_process.start("node", ["--prof", str(path)])
         self._update_enabled(self.confirm.isChecked())
 
@@ -305,9 +311,26 @@ class NodeDebuggerWidget(QWidget):
             self._append(stderr.rstrip())
 
     def _profiler_finished(self, code, _status):
+        if self._processing_profile:
+            self._append(f"Обработка профиля завершена, код: {code}")
+            if self._profile_log_path and self._profile_log_path.exists():
+                try:
+                    self._profile_log_path.unlink()
+                except OSError:
+                    pass
+            self._profile_log_path = None
+            self._processing_profile = False
+            self._update_enabled(self.confirm.isChecked())
+            return
         self._append(f"Профилирование завершено, код: {code}")
-        logs = sorted(self.folder.glob("isolate-*.log"), key=lambda path: path.stat().st_mtime, reverse=True)
+        logs = sorted(
+            (path for path in self.folder.glob("isolate-*.log") if path.stat().st_mtime >= self._profile_started_at - 1),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True
+        )
         if code == 0 and logs:
+            self._profile_log_path = logs[0]
+            self._processing_profile = True
             self._append(f"Отчёт V8 создаётся из {logs[0].name}…")
             self.profiler_process.start("node", ["--prof-process", str(logs[0])])
         else:

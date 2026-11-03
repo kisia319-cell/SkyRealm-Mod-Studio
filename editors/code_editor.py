@@ -1,3 +1,4 @@
+import re
 from PySide6.QtCore import QRect, QSize, Qt, QStringListModel
 from PySide6.QtGui import QColor, QFont, QPainter, QSyntaxHighlighter, QTextCharFormat, QKeySequence
 from PySide6.QtWidgets import QPlainTextEdit, QWidget, QCompleter, QTextEdit

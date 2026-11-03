@@ -164,7 +164,13 @@ class VisualDataDesigner(QWidget):
         self._sync_raw()
 
     def _form_data(self):
-        data = {}
+        current_text = self.raw.toPlainText().strip()
+        if current_text:
+            data = json.loads(current_text)
+            if not isinstance(data, dict):
+                raise ValueError("Корень JSON должен быть объектом.")
+        else:
+            data = {}
         for key, control in self._controls.items():
             if isinstance(control, QCheckBox):
                 data[key] = control.isChecked()

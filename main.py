@@ -16,7 +16,8 @@ from PySide6.QtWidgets import (
     QListWidget, QTabWidget, QPlainTextEdit, QInputDialog, QScrollArea
 )
 
-from core.code_analysis import analyze_file\nfrom core.project_validation import validate_project
+from core.code_analysis import analyze_file
+from core.project_validation import validate_project
 from editors.code_editor import CodeEditor
 from studio_features import (ApiCatalogDialog, ProjectSearchDialog, TemplateWizard, ConsoleDialog, HistoryDialog, add_fade_animation)
 from advanced_tools import AdvancedToolsDialog

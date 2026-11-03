@@ -26,6 +26,10 @@ def _write_text_atomic(path, content):
 
 
 def prepare_release(project, destination, game_version="", notes=""):
+    if not isinstance(game_version, str):
+        raise ValueError("Версия SkyRealm должна быть текстом.")
+    if not isinstance(notes, str):
+        raise ValueError("Описание релиза должно быть текстом.")
     root = Path(project).resolve()
     target = Path(destination).expanduser().resolve()
     metadata, errors, warnings = validate_manifest(root)

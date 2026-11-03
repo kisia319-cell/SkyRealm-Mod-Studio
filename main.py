@@ -729,6 +729,9 @@ class StudioWindow(QMainWindow):
         self._update_thread.start()
 
     def on_update_check(self, info, error):
+        if error == "NO_RELEASE":
+            self.update_status.setText("Первый релиз ещё не опубликован")
+            return
         if error:
             self.update_status.setText("Не удалось проверить обновления")
             return

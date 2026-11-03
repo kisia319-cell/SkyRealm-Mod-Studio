@@ -94,7 +94,7 @@ class InspectorWorker(QThread):
                 try:
                     raw = socket.recv()
                 except Exception as exc:
-                    if "timeout" in str(exc).lower():
+                    if "timed out" in str(exc).lower() or "timeout" in str(exc).lower():
                         continue
                     if not self.stopping.is_set():
                         self.output.emit(f"Соединение отладчика закрыто: {exc}")

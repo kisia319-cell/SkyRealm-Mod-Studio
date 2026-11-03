@@ -47,6 +47,14 @@ class ProjectValidationTests(unittest.TestCase):
             _, errors, _ = validate_manifest(root)
             self.assertTrue(any("entry" in error for error in errors))
 
+    def test_malformed_dependency_value_returns_validation_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_project(Path(tmp) / "Demo", {
+                "name": "Demo", "id": "demo.mod", "version": "1.0.0",
+                "entry": "scripts/main.js", "dependencies": [{"invalid": "value"}]
+            })
+            errors, warnings = validate_project(root)
+            self.assertTrue(any("ID" in error for error in errors))
     def test_detects_duplicate_ids_and_missing_dependencies(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_project(Path(tmp) / "Demo", {

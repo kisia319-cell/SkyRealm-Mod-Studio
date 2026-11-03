@@ -359,9 +359,9 @@ class AdvancedToolsDialog(QDialog):
         temp_name = None
         try:
             fd, temp_name = tempfile.mkstemp(prefix=".studio-mods-", suffix=".tmp", dir=str(self.folder))
-            with os.fdopen(fd, "w", encoding="utf-8", newline="\\n") as stream:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
                 json.dump(state, stream, ensure_ascii=False, indent=2)
-                stream.write("\\n")
+                stream.write("\n")
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temp_name, self.folder / ".studio-mods.json")
@@ -411,7 +411,7 @@ class AdvancedToolsDialog(QDialog):
         if not errors and not warnings:
             lines.append("Заявленные ограничения версии не противоречат выбранной версии игры.")
         lines.append("Примечание: проверяются только поля manifest; фактические игровые API и runtime не запускаются.")
-        self.package_report.setPlainText("\\n".join(lines))
+        self.package_report.setPlainText("\n".join(lines))
         logging.info("Compatibility check completed for game %s", self.game_version.text().strip())
 
     def _validate_package(self):
@@ -428,7 +428,7 @@ class AdvancedToolsDialog(QDialog):
         if not errors and not warnings:
             lines.append("Ошибок и предупреждений не обнаружено.")
         lines.append("Совместимость с игровым runtime не подтверждена.")
-        self.package_report.setPlainText("\\n".join(lines))
+        self.package_report.setPlainText("\n".join(lines))
         return not errors
 
     def _build_zip(self):
@@ -464,8 +464,8 @@ class AdvancedToolsDialog(QDialog):
                     raise zipfile.BadZipFile(f"Контроль ZIP не пройдена: {damaged}")
             os.replace(temp_name, target)
             temp_name = None
-            self.package_report.appendPlainText(f"\\nСоздан архив: {target}\\nФайлов: {count}\\nКонтроль целостности ZIP: пройдена")
-            QMessageBox.information(self, "Сборка завершена", f"ZIP создан:\\n{target}\\n\\nАрхив исходников. Проверь его в игре перед публикацией.")
+            self.package_report.appendPlainText(f"\nСоздан архив: {target}\nФайлов: {count}\nКонтроль целостности ZIP: пройдена")
+            QMessageBox.information(self, "Сборка завершена", f"ZIP создан:\n{target}\n\nАрхив исходников. Проверь его в игре перед публикацией.")
             logging.info("Packaged project into %s (%s files)", target, count)
         except (OSError, zipfile.BadZipFile) as exc:
             QMessageBox.critical(self, "Ошибка сборки", str(exc))

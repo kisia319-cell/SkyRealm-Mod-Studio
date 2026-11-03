@@ -24,7 +24,7 @@ class SyntaxHighlighter(QSyntaxHighlighter):
             fmt.setForeground(QColor(color))
             if bold:
                 fmt.setFontWeight(QFont.Weight.Bold)
-            self.rules.append((pattern, fmt))
+            self.rules.append((re.compile(pattern), fmt))
 
         if language == "JavaScript":
             rule(r"\b(function|return|const|let|var|if|else|for|while|new|class|this|throw|try|catch|async|await)\b", "#72a7ff", True)
@@ -42,9 +42,8 @@ class SyntaxHighlighter(QSyntaxHighlighter):
         rule(r"\b\d+(?:\.\d+)?\b", "#f4b86a")
 
     def highlightBlock(self, text):
-        import re
         for pattern, fmt in self.rules:
-            for match in re.finditer(pattern, text):
+            for match in pattern.finditer(text):
                 self.setFormat(match.start(), match.end() - match.start(), fmt)
 
 

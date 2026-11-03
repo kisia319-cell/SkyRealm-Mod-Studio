@@ -1,12 +1,12 @@
 from PySide6.QtCore import QRect, QSize, Qt, QStringListModel
 from PySide6.QtGui import QColor, QFont, QPainter, QSyntaxHighlighter, QTextCharFormat, QKeySequence
-from PySide6.QtWidgets import QPlainTextEdit, QWidget, QCompleter
+from PySide6.QtWidgets import QPlainTextEdit, QWidget, QCompleter, QTextEdit
 
 
 COMPLETIONS = {
     "JavaScript": ["function", "const", "let", "var", "return", "if", "else",
                    "for", "while", "true", "false", "null", "undefined",
-                   "onTick", "onStart", "context", "health", "hunger"],
+                   "onTick", "onStart", "context", "health", "hunger", "stamina", "level", "xp", "day", "night", "difficulty", "inHouse", "wallet", "heal", "gold", "message", "console", "Math", "JSON", "Array", "Object", "Number", "String", "Promise", "map", "filter", "forEach", "find", "includes"],
     "Python": ["def", "class", "return", "if", "elif", "else", "for", "while",
                "import", "from", "True", "False", "None", "try", "except"],
     "JSON": ["true", "false", "null"],
@@ -79,6 +79,17 @@ class CodeEditor(QPlainTextEdit):
         self.completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self.completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         self.completer.activated.connect(self.insert_completion)
+        self.cursorPositionChanged.connect(self.highlight_current_line)
+        self.highlight_current_line()
+
+    def highlight_current_line(self):
+        from PySide6.QtGui import QTextFormat
+        selection = QTextEdit.ExtraSelection()
+        selection.format.setBackground(QColor("#111d32"))
+        selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+        selection.cursor = self.textCursor()
+        selection.cursor.clearSelection()
+        self.setExtraSelections([selection] if not self.isReadOnly() else [])
 
     def set_language(self, language):
         self.language = language
@@ -151,6 +162,18 @@ class CodeEditor(QPlainTextEdit):
             self.completer.setCompletionPrefix(prefix)
             popup = self.completer.popup()
             self.completer.complete()
-            popup.setCurrentIndex(self.completer.completionModel().index(0, 0))
+            if self.completer.completionCount():
+                popup.setCurrentIndex(self.completer.completionModel().index(0, 0))
             return
         super().keyPressEvent(event)
+        if (event.text() and (event.text().isalnum() or event.text() == "_")
+                and not event.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier)):
+            cursor = self.textCursor()
+            cursor.select(cursor.SelectionType.WordUnderCursor)
+            prefix = cursor.selectedText()
+            if len(prefix) >= 2:
+                self.completer.setCompletionPrefix(prefix)
+                popup = self.completer.popup()
+                self.completer.complete()
+                if self.completer.completionCount() == 0:
+                    popup.hide()

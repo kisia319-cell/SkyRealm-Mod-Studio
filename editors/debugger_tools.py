@@ -13,6 +13,11 @@ from PySide6.QtWidgets import (
 )
 
 
+def is_timeout_error(error):
+    message = str(error).lower()
+    return "timed out" in message or "timeout" in message
+
+
 def parse_breakpoints(value):
     result = []
     for part in value.split(","):
@@ -95,7 +100,7 @@ class InspectorWorker(QThread):
                 try:
                     raw = socket.recv()
                 except Exception as exc:
-                    if "timed out" in str(exc).lower() or "timeout" in str(exc).lower():
+                    if is_timeout_error(exc):
                         continue
                     if not self.stopping.is_set():
                         self.output.emit(f"Соединение отладчика закрыто: {exc}")

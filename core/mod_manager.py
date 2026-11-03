@@ -37,6 +37,10 @@ def discover_mods(project: Path, state=None):
         if mod_id in mods:
             errors.append(f"Повторяющийся ID мода: {mod_id}")
             continue
+        enabled_value = state.get(mod_id, True)
+        if not isinstance(enabled_value, bool):
+            warnings.append(f"{folder_name}: некорректный флаг включения; используется включённое состояние.")
+            enabled_value = True
         mods[mod_id] = {
             "id": mod_id,
             "name": metadata["name"],
@@ -46,7 +50,7 @@ def discover_mods(project: Path, state=None):
             "relative_path": str(manifest.parent.relative_to(root)).replace("\\", "/"),
             "dependencies": _as_ids(metadata.get("dependencies", {})),
             "conflicts": _as_ids(metadata.get("conflicts", {})),
-            "enabled": bool(state.get(mod_id, True)),
+            "enabled": enabled_value,
         }
     return mods, errors, warnings
 

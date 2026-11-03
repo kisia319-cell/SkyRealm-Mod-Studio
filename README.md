@@ -12,7 +12,7 @@ Windows desktop editor for SkyRealm mod projects.
 - Learning course, limited SkyRealm API catalog and educational starter templates.
 - GitHub Releases update check and portable EXE update flow with SHA-256 verification when the release asset exposes a digest.
 
-## Advanced tools (1.7.2)
+## Advanced tools (1.7.3)
 
 Open **Все инструменты** in a project to access:
 
@@ -61,7 +61,7 @@ The executable is written to `dist/SkyRealmModStudio.exe`.
 
 ## Releases and updates
 
-Pushing supported source changes to `main` triggers the Windows build and updates the stable GitHub Release `v1.7.2`. The release asset is named `SkyRealmModStudio.exe`. Update checks and downloads require an internet connection. Users can decline an update and install it later.
+Pushing supported source changes to `main` triggers the Windows build and updates the stable GitHub Release `v1.7.3`. The release asset is named `SkyRealmModStudio.exe`. Update checks and downloads require an internet connection. Users can decline an update and install it later.
 
 ## Safety and packaging
 

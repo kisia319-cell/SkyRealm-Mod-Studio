@@ -1,5 +1,6 @@
 import ast
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -32,10 +33,18 @@ def analyze_file(path: Path, text: str):
                                                  newline="\n", delete=False) as temp:
                     temp.write(text)
                     temp_path = Path(temp.name)
+                startupinfo = None
+                creationflags = 0
+                if os.name == "nt":
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = subprocess.SW_HIDE
+                    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
                 result = subprocess.run(
                     [node, "--check", str(temp_path)],
-                    text=True, capture_output=True, timeout=15,
+                    text=True, capture_output=True, timeout=6,
                     encoding="utf-8", errors="replace",
+                    startupinfo=startupinfo, creationflags=creationflags,
                 )
                 if result.returncode:
                     message = (result.stderr or result.stdout).strip()
@@ -50,7 +59,7 @@ def analyze_file(path: Path, text: str):
                     issues.append((line, col, "Ошибка JavaScript", message[-1200:]))
             except subprocess.TimeoutExpired:
                 issues.append((1, 1, "Проверка JavaScript прервана",
-                               "Node.js не ответил за 15 секунд. Проверь установку Node.js и попробуй снова."))
+                               "Node.js не ответил за 6 секунд. Проверь установку Node.js и попробуй снова."))
             except OSError as exc:
                 issues.append((1, 1, "Не удалось проверить JavaScript", str(exc)))
             finally:

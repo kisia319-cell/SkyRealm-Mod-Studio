@@ -30,6 +30,9 @@ class VisualDataDesigner(QWidget):
         super().__init__(parent)
         self.folder = Path(project_folder).resolve()
         self._loading = False
+        self._preview_timer = QTimer(self)
+        self._preview_timer.timeout.connect(self._advance_animation_preview)
+        self._animation_preview_index = 0
         self._controls = {}
         self._array_controls = {}
         root = QVBoxLayout(self)
@@ -93,10 +96,16 @@ class VisualDataDesigner(QWidget):
         frame_buttons = QHBoxLayout()
         add_frame = QPushButton("＋ Добавить кадр")
         remove_frame = QPushButton("Удалить выбранный")
+        play = QPushButton("▶ Просмотр")
+        stop = QPushButton("■ Стоп")
         add_frame.clicked.connect(self.add_frame)
         remove_frame.clicked.connect(self.remove_frame)
+        play.clicked.connect(self.start_animation_preview)
+        stop.clicked.connect(self.stop_animation_preview)
         frame_buttons.addWidget(add_frame)
         frame_buttons.addWidget(remove_frame)
+        frame_buttons.addWidget(play)
+        frame_buttons.addWidget(stop)
         frame_buttons.addStretch()
         anim_layout.addLayout(frame_buttons)
         self.tabs.addTab(self.animation_page, "Кадры анимации")
@@ -167,6 +176,7 @@ class VisualDataDesigner(QWidget):
         self._array_controls.clear()
 
     def load_template(self, kind):
+        self.stop_animation_preview()
         self._loading = True
         self._clear_form()
         _, template = DATA_TYPES[kind]
@@ -408,6 +418,59 @@ class VisualDataDesigner(QWidget):
         for col, value in enumerate(values):
             self.frames.setItem(row, col, QTableWidgetItem(str(value)))
 
+    def start_animation_preview(self):
+        if not self.frames.rowCount():
+            QMessageBox.information(self, "Анимация", "Сначала добавь кадры.")
+            return
+        self._animation_preview_index = 0
+        self._show_animation_preview_frame()
+
+    def _show_animation_preview_frame(self):
+        row = self._animation_preview_index
+        sprite_item = self.frames.item(row, 0)
+        sprite = sprite_item.text().strip() if sprite_item else ""
+        if sprite:
+            image_path = (self.folder / sprite).resolve()
+            try:
+                image_path.relative_to(self.folder)
+                pixmap = QPixmap(str(image_path))
+                if image_path.is_file() and not pixmap.isNull():
+                    self.preview_image.setPixmap(pixmap.scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+                    self.preview_image.setText("")
+                else:
+                    self.preview_image.setPixmap(QPixmap())
+                    self.preview_image.setText(sprite)
+            except ValueError:
+                self.preview_image.setPixmap(QPixmap())
+                self.preview_image.setText("Путь вне проекта")
+        duration_item = self.frames.item(row, 1)
+        try:
+            duration = max(1, int(duration_item.text())) if duration_item else 100
+        except ValueError:
+            duration = 100
+        self.preview.setText(f"Анимация • кадр {row + 1}/{self.frames.rowCount()} • {duration} мс")
+        self._preview_timer.start(duration)
+
+    def _advance_animation_preview(self):
+        self._animation_preview_index += 1
+        if self._animation_preview_index >= self.frames.rowCount():
+            try:
+                loop = bool(json.loads(self.raw.toPlainText()).get("loop", False))
+            except (ValueError, AttributeError):
+                loop = False
+            if not loop:
+                self.stop_animation_preview()
+                return
+            self._animation_preview_index = 0
+        self._show_animation_preview_frame()
+
+    def stop_animation_preview(self):
+        if hasattr(self, "_preview_timer") and self._preview_timer.isActive():
+            self._preview_timer.stop()
+
+    def closeEvent(self, event):
+        self.stop_animation_preview()
+        super().closeEvent(event)
     def add_frame(self):
         self._insert_frame()
         self._sync_raw()

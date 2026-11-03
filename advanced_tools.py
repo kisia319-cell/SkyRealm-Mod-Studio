@@ -22,6 +22,7 @@ from core.publisher import prepare_release
 from editors.data_designer import VisualDataDesigner
 from editors.sprite_editor import SpriteEditorDialog
 from editors.debugger_tools import NodeDebuggerWidget
+from editors.studio_suite import StudioSuiteWidget
 
 from PySide6.QtCore import Qt, QProcess, QProcessEnvironment
 from PySide6.QtGui import QFont, QPixmap, QIcon
@@ -83,6 +84,7 @@ class AdvancedToolsDialog(QDialog):
         self.tabs.addTab(self._build_publish(), "Центр публикации")
         self.tabs.addTab(self._build_git(), "Git")
         self.tabs.addTab(self._build_logs(), "Живые логи")
+        self.tabs.addTab(StudioSuiteWidget(self.folder, self), "Расширенная мастерская")
         root.addWidget(self.tabs, 1)
         close = QPushButton("Закрыть")
         close.clicked.connect(self.accept)

@@ -4,7 +4,7 @@ import re
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -155,18 +155,29 @@ class CodeEditorWindow(QMainWindow):
         footer.addWidget(close)
         layout.addLayout(footer)
         self.setCentralWidget(central)
-        self.editor.textChanged.connect(lambda: self.status.setText("Есть несохранённые изменения"))
+        self.autosave_timer = QTimer(self)
+        self.autosave_timer.setSingleShot(True)
+        self.autosave_timer.setInterval(700)
+        self.autosave_timer.timeout.connect(self.save_code)
+        self.editor.textChanged.connect(self.schedule_autosave)
+
+    def schedule_autosave(self):
+        self.status.setText("Изменения… автосохранение через секунду")
+        self.autosave_timer.start()
 
     def save_code(self):
+        self.autosave_timer.stop()
         try:
             self.script_path.parent.mkdir(parents=True, exist_ok=True)
             self.script_path.write_text(self.editor.toPlainText(), encoding="utf-8")
-            self.status.setText("Сохранено")
+            self.status.setText("Автосохранено")
         except OSError as error:
-            QMessageBox.critical(self, "Ошибка сохранения", str(error))
+            self.status.setText(f"Ошибка автосохранения: {error}")
 
     def closeEvent(self, event):
-        if self.status.text() == "Есть несохранённые изменения":
+        if self.autosave_timer.isActive():
+            self.save_code()
+        if self.status.text().startswith("Ошибка автосохранения"): 
             answer = QMessageBox.question(
                 self, "Несохранённый код",
                 "Сохранить изменения перед закрытием?",
@@ -293,10 +304,14 @@ class ModEditorWindow(QMainWindow):
         root.addLayout(footer)
         self.setCentralWidget(central)
 
-        self.name_field.textChanged.connect(self.mark_dirty)
-        self.version_field.textChanged.connect(self.mark_dirty)
-        self.author_field.textChanged.connect(self.mark_dirty)
-        self.description_field.textChanged.connect(self.mark_dirty)
+        self.autosave_timer = QTimer(self)
+        self.autosave_timer.setSingleShot(True)
+        self.autosave_timer.setInterval(700)
+        self.autosave_timer.timeout.connect(self.save_project)
+        self.name_field.textChanged.connect(self.schedule_autosave)
+        self.version_field.textChanged.connect(self.schedule_autosave)
+        self.author_field.textChanged.connect(self.schedule_autosave)
+        self.description_field.textChanged.connect(self.schedule_autosave)
         self.code_editor_window = None
 
     def open_code_editor(self):
@@ -306,10 +321,12 @@ class ModEditorWindow(QMainWindow):
         self.code_editor_window.raise_()
         self.code_editor_window.activateWindow()
 
-    def mark_dirty(self, *_):
-        self.status.setText("Есть несохранённые изменения")
+    def schedule_autosave(self, *_):
+        self.status.setText("Изменения… автосохранение через секунду")
+        self.autosave_timer.start()
 
     def save_project(self):
+        self.autosave_timer.stop()
         try:
             metadata = json.loads(self.metadata_path.read_text(encoding="utf-8"))
             metadata.update({
@@ -324,9 +341,9 @@ class ModEditorWindow(QMainWindow):
             self.metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=4), encoding="utf-8")
             self.project_title.setText(metadata["name"])
             self.setWindowTitle(f"SkyRealm Mod Studio — {metadata['name']}")
-            self.status.setText("Сохранено")
+            self.status.setText("Автосохранено")
         except (OSError, json.JSONDecodeError) as error:
-            QMessageBox.critical(self, "Ошибка сохранения", str(error))
+            self.status.setText(f"Ошибка автосохранения: {error}")
 
     def open_project_folder(self):
         try:
@@ -338,22 +355,23 @@ class ModEditorWindow(QMainWindow):
         self.close()
 
     def closeEvent(self, event):
-        if self.status.text() == "Есть несохранённые изменения":
+        if self.autosave_timer.isActive():
+            self.save_project()
+        if self.status.text().startswith("Ошибка автосохранения"):
             answer = QMessageBox.question(
-                self, "Несохранённые изменения",
-                "Сохранить изменения перед выходом из редактора?",
-                QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard |
-                QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Save
+                self, "Ошибка сохранения",
+                "Не удалось сохранить проект. Всё равно закрыть окно?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
-            if answer == QMessageBox.StandardButton.Cancel:
+            if answer == QMessageBox.StandardButton.No:
                 event.ignore()
                 return
-            if answer == QMessageBox.StandardButton.Save:
-                self.save_project()
-                if self.status.text() == "Есть несохранённые изменения":
-                    event.ignore()
-                    return
+        if self.code_editor_window is not None and self.code_editor_window.isVisible():
+            self.code_editor_window.close()
+            if self.code_editor_window.isVisible():
+                event.ignore()
+                return
         self.home_window.show()
         event.accept()
 

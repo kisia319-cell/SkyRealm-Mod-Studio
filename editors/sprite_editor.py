@@ -206,7 +206,16 @@ class SpriteEditorDialog(QDialog):
 
     def save_image(self):
         folder = self.folder / "assets" / "sprites"
+        assets_root = self.folder / "assets"
+        if assets_root.is_symlink() or folder.is_symlink():
+            QMessageBox.warning(self, "Недопустимый путь", "Папки assets/ и assets/sprites/ не должны быть символическими ссылками.")
+            return
         folder.mkdir(parents=True, exist_ok=True)
+        try:
+            folder.resolve().relative_to(self.folder)
+        except ValueError:
+            QMessageBox.warning(self, "Недопустимый путь", "Папка спрайтов выходит за пределы проекта.")
+            return
         filename, _ = QFileDialog.getSaveFileName(self, "Сохранить спрайт", str(folder / "new_sprite.png"), "PNG (*.png)")
         if not filename:
             return

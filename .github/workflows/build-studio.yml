@@ -34,7 +34,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
       - name: Compile Python sources
-        run: python -m compileall -q main.py core editors updater.py
+        run: python -m compileall -q main.py core editors updater.py tests
+      - name: Run Studio regression tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python tests/test_studio_core.py
       - name: Build standalone executable
         run: pyinstaller --noconfirm --clean --onefile --windowed --name SkyRealmModStudio main.py
       - name: Upload build artifact

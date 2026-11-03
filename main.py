@@ -13,13 +13,13 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QMessageBox, QFrame, QDialog, QLineEdit, QFileDialog,
     QFormLayout, QComboBox, QSplitter, QTreeWidget, QTreeWidgetItem,
-    QListWidget, QTabWidget, QPlainTextEdit, QInputDialog
+    QListWidget, QTabWidget, QPlainTextEdit, QInputDialog, QScrollArea
 )
 
 from core.code_analysis import analyze_file
 from editors.code_editor import CodeEditor
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 REPOSITORY = "kisia319-cell/SkyRealm-Mod-Studio"
 LANGUAGE_EXTENSIONS = {"JavaScript": ".js", "JSON": ".json", "Python": ".py"}
 EXTENSION_LANGUAGES = {".js": "JavaScript", ".mjs": "JavaScript", ".json": "JSON", ".py": "Python"}
@@ -50,6 +50,162 @@ def project_metadata(folder: Path):
     if not isinstance(data, dict) or not data.get("name"):
         raise ValueError("Файл mod.json повреждён или в нём отсутствует название проекта.")
     return data
+
+
+
+class LearningDialog(QDialog):
+    LESSONS = [
+        ("1. Как устроен проект",
+         "Проект мода — это отдельная папка.\n\n"
+         "mod.json — паспорт мода: имя, версия, автор и путь к главному файлу.\n"
+         "scripts/main.js — главный JavaScript-файл, в котором пишется логика.\n"
+         "README.md — заметки о моде.\n\n"
+         "Начни с маленьких изменений и сохраняй проект. Экспорт ZIP создаёт резервный архив исходников."),
+        ("2. Переменные и значения",
+         "Переменная хранит значение, которым можно пользоваться в коде.\n\n"
+         "const name = \"Огненный меч\";\n"
+         "let damage = 25;\n"
+         "let isRare = true;\n\n"
+         "const используют, когда переменную не нужно переназначать. let — когда значение будет меняться.\n"
+         "Основные типы: string (текст), number (число), boolean (true/false), null и undefined."),
+        ("3. Объекты и массивы",
+         "Объект объединяет свойства одной сущности. Массив хранит список значений.\n\n"
+         "const sword = {\n"
+         "  name: \"Огненный меч\",\n"
+         "  damage: 25,\n"
+         "  level: 2\n"
+         "};\n\n"
+         "const ores = [\"stone\", \"coal\", \"iron\"];\n"
+         "console.log(sword.damage);\n"
+         "console.log(ores[0]);\n\n"
+         "У объектов обращаются к свойству через точку. Индексы массива начинаются с нуля."),
+        ("4. Условия",
+         "if выполняет код, когда условие истинно. else задаёт альтернативу.\n\n"
+         "const health = 35;\n"
+         "if (health <= 0) {\n"
+         "  console.log(\"Персонаж погиб\");\n"
+         "} else if (health < 40) {\n"
+         "  console.log(\"Мало здоровья\");\n"
+         "} else {\n"
+         "  console.log(\"Всё хорошо\");\n"
+         "}\n\n"
+         "Операторы: === равно, !== не равно, > больше, < меньше, >= и <=. Для сравнения обычно используй ===, а не =."),
+        ("5. Функции",
+         "Функция — именованный блок кода, который можно вызывать много раз.\n\n"
+         "function calculateDamage(baseDamage, bonus) {\n"
+         "  return baseDamage + bonus;\n"
+         "}\n\n"
+         "const total = calculateDamage(20, 5);\n"
+         "console.log(total); // 25\n\n"
+         "Параметры — входные значения. return возвращает результат. Без return функция обычно возвращает undefined."),
+        ("6. Циклы",
+         "Циклы повторяют действия. Не запускай бесконечные циклы в редакторе: проверка синтаксиса не запускает код.\n\n"
+         "const rewards = [\"wood\", \"stone\", \"iron\"];\n"
+         "for (const reward of rewards) {\n"
+         "  console.log(\"Награда:\", reward);\n"
+         "}\n\n"
+         "for удобно использовать, когда нужен счётчик. for...of — когда нужно пройти по элементам массива."),
+        ("7. Ошибки и отладка",
+         "Синтаксическая ошибка означает, что JavaScript не может разобрать запись. Например, забыта скобка или кавычка.\n\n"
+         "Логическая ошибка — код синтаксически верен, но делает не то, что задумано.\n\n"
+         "Проверяй по шагам:\n"
+         "1) Нажми Ctrl+S или дождись автосохранения.\n"
+         "2) Посмотри список «Проверка кода».\n"
+         "3) Нажми на ошибку — редактор перейдёт к строке.\n"
+         "4) Проверь имена переменных, скобки и условия.\n"
+         "5) Нажми «Проверить проект»."),
+        ("8. Практика: урон и лечение",
+         "Попробуй понять этот пример и изменить числа. Это обычный учебный JavaScript-объект, он не управляет персонажем в самой игре.\n\n"
+         "const player = { health: 80, damage: 12 };\n"
+         "function hit(enemy) {\n"
+         "  if (enemy.health <= 0) return;\n"
+         "  enemy.health = Math.max(0, enemy.health - player.damage);\n"
+         "  console.log(\"Здоровье врага:\", enemy.health);\n"
+         "}\n"
+         "function heal(amount) {\n"
+         "  if (amount <= 0) return;\n"
+         "  player.health = Math.min(100, player.health + amount);\n"
+         "}\n"
+         "const enemy = { health: 30 };\n"
+         "hit(enemy);\n"
+         "heal(10);\n\n"
+         "Math.max(0, ...) не даёт здоровью врага уйти ниже нуля. Math.min(100, ...) ограничивает здоровье игрока максимумом 100."),
+        ("9. Как это связано со SkyRealm",
+         "JavaScript — основной язык скриптов модов в Studio. Но наличие редактора и успешная проверка синтаксиса ещё не означает, что произвольный код получает доступ к игровому миру.\n\n"
+         "Не придумывай названия игровых функций наугад. Для реального управления персонажем, предметами и событиями нужен документированный API конкретной версии SkyRealm и поддержка со стороны игрового runtime.\n\n"
+         "JSON хранит настройки и данные. Python в Studio можно редактировать и проверять, но запуск Python-модов в игре сейчас не заявлен. Никогда не запускай неизвестный код из интернета.")
+    ]
+
+    def __init__(self, parent=None, intro=False):
+        super().__init__(parent)
+        self.setWindowTitle("Обучение — SkyRealm Mod Studio")
+        self.resize(980, 720)
+        self.setMinimumSize(760, 560)
+        root = QVBoxLayout(self)
+        heading = QLabel("Большое обучение созданию модов")
+        heading.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        root.addWidget(heading)
+        intro_label = QLabel("Изучи основы JavaScript, структуру проекта, проверку ошибок и ограничения моддинга SkyRealm.")
+        intro_label.setWordWrap(True)
+        intro_label.setObjectName("muted")
+        root.addWidget(intro_label)
+        self.tabs = QTabWidget()
+        for title, body in self.LESSONS:
+            page = QWidget()
+            page_layout = QVBoxLayout(page)
+            text = QPlainTextEdit()
+            text.setReadOnly(True)
+            text.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+            text.setPlainText(body)
+            text.setStyleSheet("font-size:14px; padding:12px;")
+            page_layout.addWidget(text)
+            self.tabs.addTab(page, title)
+        root.addWidget(self.tabs, 1)
+        buttons = QHBoxLayout()
+        self.skip = QPushButton("Пропустить обучение" if intro else "Закрыть")
+        self.skip.clicked.connect(self.reject)
+        buttons.addWidget(self.skip)
+        buttons.addStretch()
+        prev = QPushButton("← Назад")
+        next_btn = QPushButton("Далее →")
+        prev.clicked.connect(lambda: self.tabs.setCurrentIndex(max(0, self.tabs.currentIndex() - 1)))
+        next_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(min(self.tabs.count() - 1, self.tabs.currentIndex() + 1)))
+        buttons.addWidget(prev)
+        buttons.addWidget(next_btn)
+        finish = QPushButton("Завершить")
+        finish.setObjectName("primary")
+        finish.clicked.connect(self.accept)
+        buttons.addWidget(finish)
+        root.addLayout(buttons)
+
+
+class FirstRunDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.choice = "skip"
+        self.setWindowTitle("Добро пожаловать в SkyRealm Mod Studio")
+        self.setMinimumWidth(540)
+        layout = QVBoxLayout(self)
+        title = QLabel("Добро пожаловать!")
+        title.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        message = QLabel("Перед началом можно пройти большое обучение: от первых переменных до создания структуры мода и поиска ошибок. Его можно посмотреть сейчас или пропустить и открыть позже через кнопку «Обучение».")
+        message.setWordWrap(True)
+        layout.addWidget(message)
+        buttons = QHBoxLayout()
+        watch = QPushButton("Посмотреть обучение")
+        watch.setObjectName("primary")
+        skip = QPushButton("Пропустить")
+        watch.clicked.connect(self.watch)
+        skip.clicked.connect(self.reject)
+        buttons.addWidget(watch)
+        buttons.addWidget(skip)
+        layout.addLayout(buttons)
+
+    def watch(self):
+        self.choice = "watch"
+        self.accept()
 
 
 class CreateProjectDialog(QDialog):
@@ -400,20 +556,8 @@ class ProjectWindow(QMainWindow):
             QMessageBox.critical(self, "Ошибка восстановления", str(exc))
 
     def show_help(self):
-        QMessageBox.information(self, "Справка SkyRealm Mod Studio",
-            "КАК РАБОТАТЬ\n"
-            "1. Создай проект или открой папку с mod.json.\n"
-            "2. Выбери файл слева, редактируй и сохраняй через Ctrl+S.\n"
-            "3. Ctrl+Space открывает подсказки кода; Enter сохраняет отступ.\n"
-            "4. Ошибки отображаются внизу редактора — нажми на ошибку, чтобы перейти к строке.\n"
-            "5. «Проверить проект» проверяет mod.json и исходные файлы.\n"
-            "6. «Экспорт ZIP» создаёт архив исходников проекта.\n\n"
-            "ЯЗЫКИ\n"
-            "JavaScript — основной язык модов SkyRealm.\n"
-            "JSON — данные и настройки.\n"
-            "Python — редактирование и проверка синтаксиса; запуск Python-модов в игре пока не поддерживается.\n\n"
-            "РЕЗЕРВНЫЕ КОПИИ\n"
-            "Перед сохранением последняя версия файла копируется в .backups. Кнопка «Восстановить» возвращает эту копию.")
+        dialog = LearningDialog(self)
+        dialog.exec()
 
     def format_current_file(self):
         if self.current_file is None:
@@ -621,8 +765,11 @@ class StudioWindow(QMainWindow):
         create.clicked.connect(self.create_project)
         open_btn = QPushButton("Открыть / выбрать проект")
         open_btn.clicked.connect(self.open_project)
+        learn_btn = QPushButton("Обучение: как создавать код и моды")
+        learn_btn.clicked.connect(self.show_learning)
         box.addWidget(create)
         box.addWidget(open_btn)
+        box.addWidget(learn_btn)
         box.addWidget(QLabel("Недавние проекты"))
         self.recent = QListWidget()
         self.recent.itemDoubleClicked.connect(lambda item: self.open_project_path(Path(item.data(Qt.ItemDataRole.UserRole))))
@@ -642,12 +789,27 @@ class StudioWindow(QMainWindow):
         self.setCentralWidget(root)
         self.project_window = None
         self.refresh_recent()
-        QTimer.singleShot(900, self.check_updates)
+        if not os.environ.get("SKYREALM_STUDIO_TEST"):
+            if not self.settings.get("tutorial_prompted", False):
+                QTimer.singleShot(350, self.show_first_run)
+            QTimer.singleShot(1200, self.check_updates)
+
+    def show_learning(self):
+        LearningDialog(self).exec()
+
+    def show_first_run(self):
+        dialog = FirstRunDialog(self)
+        result = dialog.exec()
+        self.settings["tutorial_prompted"] = True
+        self.settings["tutorial_choice"] = dialog.choice if result == QDialog.DialogCode.Accepted else "skip"
+        self.save_settings()
+        if result == QDialog.DialogCode.Accepted and dialog.choice == "watch":
+            LearningDialog(self, intro=True).exec()
 
     def load_settings(self):
         try:
             data = json.loads(self.settings_path.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
+            return data if isinstance(data, dict) else {"recent_projects": []}
         except (OSError, json.JSONDecodeError):
             return {"recent_projects": []}
 

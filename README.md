@@ -12,7 +12,7 @@ Windows desktop editor for SkyRealm mod projects.
 - Learning course, limited SkyRealm API catalog and educational starter templates.
 - GitHub Releases update check and portable EXE update flow with SHA-256 verification when the release asset exposes a digest.
 
-## Advanced tools (1.7.3)
+## Advanced tools (1.8.0)
 
 Open **Все инструменты** in a project to access:
 
@@ -27,6 +27,9 @@ Open **Все инструменты** in a project to access:
 - **Центр публикации:** проверяет манифест, зависимости и заявленную версию SkyRealm; собирает ZIP релиза, JSON-манифест и SHA-256. Не публикует мод автоматически и не подтверждает работу мода в игре.
 - **Git viewer:** reads repository status and recent commits without performing destructive Git operations.
 - **Live Studio logs:** displays log records emitted by Studio tools. It is not connected to the game's runtime logs.
+- **Expanded workshop:** animation JSON authoring with frame-path validation; biome/world templates; node-graph JSON authoring and edge validation; non-executing static QA checks; dependency graph; project file watching for runtime bridge workflows; local plugin manifest discovery; ZIP mod import into `mods/`; heuristic offline code hints; and search through local API documentation.
+- **Hot Reload watcher:** monitors project folders and reports changes. It does not inject code into a running game; this requires a compatible runtime bridge.
+- **Local catalog:** lists installed project mods and safely imports ZIP bundles. A hosted public marketplace, online downloads, and community download/error statistics require a separately deployed server/API and are not fabricated by the desktop app.
 
 ## Important runtime compatibility note
 

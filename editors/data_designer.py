@@ -19,6 +19,8 @@ DATA_TYPES = {
     "Квест": ("quests", {"id": "my_mod:example_quest", "title": "Новый квест", "description": "", "objectives": [], "rewards": []}),
     "Анимация": ("animations", {"id": "my_mod:example_animation", "target": "player", "fps": 12, "loop": False, "frames": []}),
     "Биом": ("biomes", {"id": "my_mod:example_biome", "name": "Новый биом", "temperature": 0.5, "terrain": "default", "spawns": []}),
+    "Диалог NPC": ("dialogs", {"id": "my_mod:example_dialog", "title": "Диалог NPC", "npc": "villager", "nodes": [{"id": "start", "text": "Привет!", "options": []}]}),
+    "Игровое событие": ("events", {"id": "my_mod:example_event", "name": "Новое событие", "trigger": "on_day_start", "conditions": [], "actions": []}),
 }
 
 class VisualDataDesigner(QWidget):

@@ -90,22 +90,35 @@ class DownloadWorker(QThread):
 
 
 def launch_installer(current_exe: Path, new_exe: Path):
+    """Replace the running portable EXE after this process exits, keeping a backup."""
     current = str(current_exe.resolve())
     new = str(new_exe.resolve())
     script = Path(tempfile.gettempdir()) / "skyrealm_mod_studio_update.bat"
+    backup = current + ".previous"
+    staged = current + ".new"
     content = (
         "@echo off\r\n"
         "setlocal\r\n"
         "timeout /t 2 /nobreak >nul\r\n"
-        f'copy /y "{new}" "{current}" >nul\r\n'
-        "if errorlevel 1 (\r\n"
-        '  echo Не удалось заменить приложение. Новый файл оставлен в TEMP.\r\n'
-        "  pause\r\n"
-        "  exit /b 1\r\n"
-        ")\r\n"
+        f'copy /y "{new}" "{staged}" >nul\r\n'
+        "if errorlevel 1 goto failed\r\n"
+        f'if exist "{backup}" del /f /q "{backup}" >nul 2>nul\r\n'
+        f'if exist "{current}" move /y "{current}" "{backup}" >nul\r\n'
+        f'move /y "{staged}" "{current}" >nul\r\n'
+        "if errorlevel 1 goto rollback\r\n"
         f'start "" "{current}"\r\n'
         f'del /f /q "{new}" >nul 2>nul\r\n'
         'del "%~f0" >nul 2>nul\r\n'
+        "exit /b 0\r\n"
+        ":rollback\r\n"
+        f'if exist "{backup}" move /y "{backup}" "{current}" >nul\r\n'
+        ":failed\r\n"
+        'echo Не удалось установить обновление. Старая версия будет сохранена.\r\n'
+        "pause\r\n"
+        'del "%~f0" >nul 2>nul\r\n'
     )
     script.write_text(content, encoding="utf-8")
-    subprocess.Popen(["cmd.exe", "/c", "start", "", str(script)], creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    subprocess.Popen(
+        ["cmd.exe", "/c", "start", "", str(script)],
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    )

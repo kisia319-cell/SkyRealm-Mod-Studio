@@ -2,23 +2,22 @@
 
 Windows desktop editor for SkyRealm mod projects.
 
-## Current features
+## Features
 
 - Create projects in JavaScript, JSON, or Python.
-- Open an existing project by selecting its folder (it must contain a valid `mod.json`).
-- Recent project list.
+- Open existing projects and quickly return to recent projects.
 - Project file tree with create, rename, and delete actions.
-- Code editor with syntax highlighting, line numbers, indentation, and Ctrl+Space completion.
-- Automatic save and syntax diagnostics for JavaScript (Node.js), Python (AST), and JSON.
+- Code editor with syntax highlighting, line numbers, indentation, completion, and autosave.
+- Syntax diagnostics for JavaScript (Node.js), Python (AST), and JSON.
 - Click a diagnostic to jump to its line.
-- Basic safe formatting (JSON pretty-printing; whitespace cleanup for JS/Python).
-- Project syntax check, ZIP export of source files, and one-step backup/restore for edited files.
-- Built-in help for the editor and supported languages.
-- GitHub Releases update check and one-file EXE replacement on Windows.
+- Project checks, ZIP source export, and backup/restore.
+- Built-in learning course with nine lessons: project structure, variables, objects, conditions, functions, loops, debugging, practice, and SkyRealm modding limitations.
+- First-launch choice to view the course or skip it. The course remains available from the home screen and the editor's Help button.
+- GitHub Releases update check. When a newer release is found, the app asks whether to download and install it. The EXE is validated, replaced after the app exits, and the previous executable is retained as a backup.
 
-## Languages
+## Languages and compatibility
 
-JavaScript is the current game mod scripting language. JSON is used for project metadata and data files. Python is available as an editor language; running Python mods inside SkyRealm requires separate game-runtime support and is not implied by Studio.
+JavaScript is the current scripting language used by Mod Studio. JSON stores metadata and data. Python can be edited and syntax-checked, but running Python mods inside SkyRealm is not supported by this statement. A successful syntax check does not grant code access to the game: actual gameplay features require a documented API supported by the matching SkyRealm runtime.
 
 ## Requirements for development
 
@@ -38,16 +37,16 @@ py -3.12 main.py
 
 ```powershell
 py -3.12 -m pip install -r requirements.txt pyinstaller
-py -3.12 -m compileall -q main.py core editors updater.py
+py -3.12 -m compileall -q main.py core editors updater.py tests
 py -3.12 -m PyInstaller --noconfirm --clean --onefile --windowed --name SkyRealmModStudio main.py
 ```
 
 The executable is written to `dist/SkyRealmModStudio.exe`.
 
-## Auto-updates
+## Releases and updates
 
-The application checks the latest GitHub Release in `kisia319-cell/SkyRealm-Mod-Studio`. To publish the first release or a later update, open Actions → Build SkyRealm Mod Studio → Run workflow and enter a version such as `1.1.0` in `release_version`; alternatively, push a version tag such as `v1.1.1`. GitHub Actions builds the EXE and attaches it to the release. The release asset must be named `SkyRealmModStudio.exe`. Update checks are best-effort and require an internet connection.
+Pushing a change to the `main` branch builds the EXE and publishes/updates the stable GitHub Release `v1.2.0`. The release asset must be named `SkyRealmModStudio.exe`; the app checks the latest release on startup. For a future version, update `APP_VERSION` in `main.py` and the `tag_name` in `.github/workflows/build-studio.yml` together. Update checks and downloads require an internet connection. Users can decline an update and install it later.
 
-## Safety notes
+## Safety
 
-Code diagnostics parse or syntax-check source files; they do not execute mod code. ZIP export packages project source files only and does not certify compatibility with a specific SkyRealm game build.
+Code diagnostics only parse or syntax-check source files; they do not execute mod code. ZIP export packages source files only and does not certify compatibility with a specific SkyRealm game build.

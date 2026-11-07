@@ -65,7 +65,7 @@ The executable is written to `dist/SkyRealmModStudio.exe`.
 
 ## Releases and updates
 
-Pushing supported source changes to `main` triggers the Windows build and updates the stable GitHub Release `v1.7.3`. The release asset is named `SkyRealmModStudio.exe`. Update checks and downloads require an internet connection. Users can decline an update and install it later.
+Pushing supported source changes to `main` triggers the Windows build and updates the stable GitHub Release `v1.9.0`. The release asset is named `SkyRealmModStudio.exe`. Update checks and downloads require an internet connection. Users can decline an update and install it later.
 
 ## Safety and packaging
 

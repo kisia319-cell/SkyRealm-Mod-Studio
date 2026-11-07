@@ -812,7 +812,7 @@ class ProjectWindow(QMainWindow):
             self.status.setText("Публикация остановлена: найдены ошибки")
             QMessageBox.warning(
                 self, "Мод не опубликован",
-                "Сначала исправь ошибки. Файлы игры не изменены:\\n\\n" + "\\n".join(errors)
+                "Сначала исправь ошибки. Файлы игры не изменены:\n\n" + "\n".join(errors)
             )
             return
         try:
@@ -823,15 +823,15 @@ class ProjectWindow(QMainWindow):
             return
         self.status.setText("Мод опубликован в SkyRealm")
         message = (
-            f"Мод «{result['name']}» опубликован в локальную папку SkyRealm.\\n"
-            f"Язык: {result['language']}\\n"
-            f"ID: {result['id']}\\n\\n"
+            f"Мод «{result['name']}» опубликован в локальную папку SkyRealm.\n"
+            f"Язык: {result['language']}\n"
+            f"ID: {result['id']}\n\n"
             "Теперь запусти игру через SkyRealm Launcher. Открой «Каталог модов» → "
-            "«Мои скриптовые моды» и нажми «Включить».\\n\\n"
+            "«Мои скриптовые моды» и нажми «Включить».\n\n"
             "Код запускается в изолированном окне и может использовать только безопасные игровые действия."
         )
         if warnings:
-            message += "\\n\\nПредупреждения:\\n" + "\\n".join(warnings)
+            message += "\n\nПредупреждения:\n" + "\n".join(warnings)
         QMessageBox.information(self, "Публикация завершена", message)
 
     def selected_file_path(self):

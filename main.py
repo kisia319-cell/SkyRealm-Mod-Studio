@@ -1073,23 +1073,24 @@ class StudioWindow(QMainWindow):
                         "language": language, "author": "", "description": ""}
             (folder / "mod.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=4), encoding="utf-8")
             starter_sources = {
-                "JavaScript": (
-                    "function onTick(context, state) {\\n"
-                    "  if (!state.started) {\\n"
-                    "    state.started = true;\\n"
-                    "    return { state, actions: [{ type: \\"message\\", text: \\"Мой мод запущен!\\" }] };\\n"
-                    "  }\\n"
-                    "  return { state, actions: [] };\\n"
-                    "}\\n"
-                ),
-                "Python": (
-                    "def on_tick(context, state):\\n"
-                    "    if not state.get(\\"started\\"): \\n"
-                    "        state[\\"started\\"] = True\\n"
-                    "        return {\\"state\\": state, \\"actions\\": [{\\"type\\": \\"message\\", \\"text\\": \\"Мой мод запущен!\\"}]}\\n"
-                    "    return {\\"state\\": state, \\"actions\\": []}\\n"
-                ),
-                "JSON": "{\\n    \\"example\\": true\\n}\\n",
+                "JavaScript": """function onTick(context, state) {
+  if (!state.started) {
+    state.started = true;
+    return { state, actions: [{ type: "message", text: "Мой мод запущен!" }] };
+  }
+  return { state, actions: [] };
+}
+""",
+                "Python": """def on_tick(context, state):
+    if not state.get("started"):
+        state["started"] = True
+        return {"state": state, "actions": [{"type": "message", "text": "Мой мод запущен!"}]}
+    return {"state": state, "actions": []}
+""",
+                "JSON": """{
+  "example": true
+}
+""",
             }
             (folder / entry).write_text(starter_sources.get(language, ""), encoding="utf-8")
             (folder / "README.md").write_text(f"# {name}\n\nМодификация для SkyRealm.\n", encoding="utf-8")

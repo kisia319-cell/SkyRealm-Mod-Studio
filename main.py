@@ -19,11 +19,12 @@ from PySide6.QtWidgets import (
 from core.code_analysis import analyze_file
 from core.project_validation import validate_project
 from core.archive_builder import create_project_archive
+from core.game_publisher import publish_project
 from editors.code_editor import CodeEditor
 from studio_features import (ApiCatalogDialog, ProjectSearchDialog, TemplateWizard, ConsoleDialog, HistoryDialog, add_fade_animation)
 from advanced_tools import AdvancedToolsDialog
 
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.9.0"
 REPOSITORY = "kisia319-cell/SkyRealm-Mod-Studio"
 LANGUAGE_EXTENSIONS = {"JavaScript": ".js", "JSON": ".json", "Python": ".py"}
 EXTENSION_LANGUAGES = {".js": "JavaScript", ".mjs": "JavaScript", ".json": "JSON", ".py": "Python"}
@@ -344,6 +345,11 @@ class ProjectWindow(QMainWindow):
         export_btn = QPushButton("Экспорт ZIP")
         export_btn.clicked.connect(self.export_project)
         header.addWidget(export_btn)
+        publish_btn = QPushButton("Опубликовать")
+        publish_btn.setObjectName("primary")
+        publish_btn.setToolTip("Проверить проект и установить мод в SkyRealm через лаунчер")
+        publish_btn.clicked.connect(self.publish_to_game)
+        header.addWidget(publish_btn)
         metadata_btn = QPushButton("Настройки мода")
         metadata_btn.clicked.connect(self.edit_metadata)
         header.addWidget(metadata_btn)
@@ -444,6 +450,7 @@ class ProjectWindow(QMainWindow):
         self._analysis_pool = QThreadPool(self)
         self._analysis_pool.setMaxThreadCount(2)
         self._project_check_running = False
+        self._publish_check_running = False
         self.editor.textChanged.connect(self.on_text_changed)
         self.refresh_tree()
 
@@ -783,6 +790,49 @@ class ProjectWindow(QMainWindow):
             QMessageBox.warning(self, "Проверка проекта", "Найдены проблемы:\n\n" + "\n".join(problems))
         else:
             QMessageBox.information(self, "Проверка проекта", "Все исходные файлы проекта прошли синтаксическую проверку.")
+
+    def publish_to_game(self):
+        self.save_file()
+        if self.dirty:
+            return
+        if self._project_check_running or self._publish_check_running:
+            QMessageBox.information(self, "Проверка уже выполняется", "Дождись завершения текущей проверки проекта.")
+            return
+        self._publish_check_running = True
+        self.status.setText("Проверка перед публикацией выполняется в фоне…")
+        task = _ProjectCheckTask(self.folder, EXTENSION_LANGUAGES)
+        task.signals.project_finished.connect(self._apply_publish_check)
+        self._analysis_pool.start(task)
+
+    def _apply_publish_check(self, problems):
+        self._publish_check_running = False
+        errors = [value for value in problems if not value.startswith("WARNING: ")]
+        warnings = [value[len("WARNING: "):] for value in problems if value.startswith("WARNING: ")]
+        if errors:
+            self.status.setText("Публикация остановлена: найдены ошибки")
+            QMessageBox.warning(
+                self, "Мод не опубликован",
+                "Сначала исправь ошибки. Файлы игры не изменены:\\n\\n" + "\\n".join(errors)
+            )
+            return
+        try:
+            result = publish_project(self.folder)
+        except (OSError, ValueError, UnicodeError) as exc:
+            self.status.setText("Публикация не выполнена")
+            QMessageBox.critical(self, "Ошибка публикации", str(exc))
+            return
+        self.status.setText("Мод опубликован в SkyRealm")
+        message = (
+            f"Мод «{result['name']}» опубликован в локальную папку SkyRealm.\\n"
+            f"Язык: {result['language']}\\n"
+            f"ID: {result['id']}\\n\\n"
+            "Теперь запусти игру через SkyRealm Launcher. Открой «Каталог модов» → "
+            "«Мои скриптовые моды» и нажми «Включить».\\n\\n"
+            "Код запускается в изолированном окне и может использовать только безопасные игровые действия."
+        )
+        if warnings:
+            message += "\\n\\nПредупреждения:\\n" + "\\n".join(warnings)
+        QMessageBox.information(self, "Публикация завершена", message)
 
     def selected_file_path(self):
         item = self.tree.currentItem()

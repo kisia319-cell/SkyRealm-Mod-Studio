@@ -819,7 +819,7 @@ class ProjectWindow(QMainWindow):
             return
         try:
             result = publish_project(self.folder)
-        except (OSError, ValueError, UnicodeError) as exc:
+        except Exception as exc:
             self.status.setText("Публикация не выполнена")
             QMessageBox.critical(self, "Ошибка публикации", str(exc))
             return

@@ -36,7 +36,7 @@ Open **Все инструменты** in a project to access:
 
 The visual designers create project data files. They do **not** make those entities appear in SkyRealm automatically. The matching game runtime must implement and document loaders for each data format, event, animation, biome, item, weapon, mob or quest. Published script mods use the existing restricted runtime contract: JavaScript `function onTick(context, state)` or Python `def on_tick(context, state)`. They run in an isolated iframe/worker and can request only the bounded actions exposed by the game host (health, stamina, hunger, XP, gold and a short message); arbitrary game internals are not exposed. The current editor does not execute arbitrary mod code during diagnostics. The optional debugger/profiler can execute a selected JavaScript file only after explicit user confirmation; it is not sandboxed. A successful syntax check does not certify gameplay compatibility.
 
-JavaScript is the current mod scripting language described by Studio. JSON stores metadata and designer data. Python can be edited and syntax-checked, but Python mod execution inside SkyRealm is not supported by this statement.
+JavaScript and Python script mods are supported by the current runtime contract: JavaScript uses `function onTick(context, state)` and Python uses `def on_tick(context, state)`. Python execution uses Pyodide and requires an internet connection for its runtime download. JSON stores metadata and designer data; visual designer formats still require matching game loaders.
 
 ## Development requirements
 

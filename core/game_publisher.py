@@ -9,7 +9,7 @@ from pathlib import Path
 from core.code_analysis import analyze_file
 from core.project_validation import validate_manifest, validate_project
 
-_ID_RE = re.compile(r"^[a-z0-9_-]{6,48}$")
+_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._:-]{1,127}$")
 _MAX_CODE = 14000
 
 
@@ -28,7 +28,7 @@ def publish_project(folder):
 
     mod_id = str(metadata.get("id", "")).strip()
     if not _ID_RE.fullmatch(mod_id):
-        raise ValueError("Для публикации ID должен содержать 6–48 символов: a-z, 0-9, дефис или подчёркивание.")
+        raise ValueError("Для публикации ID должен содержать 2–128 символов: a-z, 0-9, точку, двоеточие, дефис или подчёркивание.")
     name = str(metadata.get("name", "")).strip()
     if not name or len(name) > 32:
         raise ValueError("Название мода должно содержать от 1 до 32 символов.")

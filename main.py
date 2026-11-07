@@ -51,12 +51,46 @@ def project_metadata(folder: Path):
     path = folder / "mod.json"
     if path.is_symlink() or not path.is_file():
         raise ValueError("В выбранной папке нет mod.json. Выбери папку проекта SkyRealm Mod Studio.")
-    data = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError:
+        raise
     if (not isinstance(data, dict)
             or not isinstance(data.get("name"), str)
             or not data["name"].strip()):
         raise ValueError("Файл mod.json должен содержать JSON-объект с непустым текстовым полем name.")
     return data
+
+
+def recover_project_metadata(folder: Path):
+    """Back up a damaged manifest and recreate safe defaults without touching mod source files."""
+    folder = Path(folder).resolve()
+    manifest = folder / "mod.json"
+    raw = manifest.read_bytes()
+    backup = folder / "mod.json.broken"
+    suffix = 1
+    while backup.exists():
+        backup = folder / f"mod.json.broken.{suffix}"
+        suffix += 1
+    backup.write_bytes(raw)
+
+    candidates = (
+        Path("scripts/main.js"), Path("scripts/main.mjs"), Path("main.js"),
+        Path("scripts/main.py"), Path("main.py"),
+    )
+    entry_path = next((candidate for candidate in candidates if (folder / candidate).is_file()), Path("scripts/main.js"))
+    language = "Python" if entry_path.suffix.lower() == ".py" else "JavaScript"
+    name = folder.name.strip() or "My Mod"
+    mod_id = re.sub(r"[^a-z0-9._:-]+", "-", name.lower()).strip("-._:") or "my-mod"
+    metadata = {
+        "name": name, "id": mod_id, "version": "1.0.0", "game": "SkyRealm",
+        "entry": entry_path.as_posix(), "language": language,
+        "author": "", "description": ""
+    }
+    temp = manifest.with_name("mod.json.recovery.tmp")
+    temp.write_text(json.dumps(metadata, ensure_ascii=False, indent=4), encoding="utf-8")
+    temp.replace(manifest)
+    return metadata, backup
 
 
 class _AnalysisSignals(QObject):
@@ -1107,7 +1141,27 @@ class StudioWindow(QMainWindow):
     def open_project_path(self, folder):
         try:
             project_metadata(folder)
-        except (ValueError, OSError, json.JSONDecodeError) as exc:
+        except json.JSONDecodeError as exc:
+            answer = QMessageBox.question(
+                self, "Повреждён mod.json",
+                f"Не удалось прочитать настройки проекта ({exc}).\\n\\n"
+                "Восстановить mod.json автоматически? Исходный файл будет сохранён рядом "
+                "как mod.json.broken, а файлы скриптов останутся без изменений.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            try:
+                _, backup = recover_project_metadata(folder)
+                QMessageBox.information(
+                    self, "Настройки восстановлены",
+                    f"Проект можно открыть. Повреждённый файл сохранён здесь:\\n{backup}"
+                )
+            except (OSError, ValueError) as recovery_error:
+                QMessageBox.critical(self, "Не удалось восстановить проект", str(recovery_error))
+                return
+        except (ValueError, OSError) as exc:
             QMessageBox.warning(self, "Не удалось открыть проект", str(exc))
             return
         self.remember_project(folder.resolve())

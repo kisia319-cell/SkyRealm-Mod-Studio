@@ -1,6 +1,7 @@
 # SkyRealm Mod Studio 1.9.0 — Direct game publishing
 
 - Added a prominent **Опубликовать** button to the project editor.
+- New JavaScript and Python projects start with a small valid script template that can be published immediately.
 - Publication runs project and syntax checks first. Any errors stop the operation without changing the installed game.
 - Valid JavaScript and Python script mods are installed to the local SkyRealm user-data folder, not into replaceable game files.
 - The SkyRealm launcher exposes the published mod records to the game; the in-game catalog imports them under **Мои скриптовые моды**.

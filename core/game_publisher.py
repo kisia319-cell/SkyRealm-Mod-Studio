@@ -24,7 +24,7 @@ def publish_project(folder):
     project_errors, project_warnings = validate_project(root)
     errors.extend(project_errors)
     if errors:
-        raise ValueError("Проверка проекта не пройдена:\\n" + "\\n".join(dict.fromkeys(errors)))
+        raise ValueError("Проверка проекта не пройдена:\n" + "\n".join(dict.fromkeys(errors)))
 
     mod_id = str(metadata.get("id", "")).strip()
     if not _ID_RE.fullmatch(mod_id):
@@ -50,14 +50,14 @@ def publish_project(folder):
     source = source_path.read_text(encoding="utf-8")
     if len(source) < 10 or len(source) > _MAX_CODE:
         raise ValueError(f"Код должен содержать от 10 до {_MAX_CODE} символов.")
-    required = r"def\\s+on_tick\\s*\\(" if language == "python" else r"function\\s+onTick\\s*\\("
+    required = r"def\s+on_tick\s*\(" if language == "python" else r"function\s+onTick\s*\("
     if not re.search(required, source):
         expected = "def on_tick(context, state):" if language == "python" else "function onTick(context, state)"
         raise ValueError(f"В главном файле должна быть функция {expected}.")
     syntax_issues = analyze_file(source_path, source)
     if syntax_issues:
-        details = "\\n".join(f"Строка {line}: {title}: {message}" for line, _col, title, message in syntax_issues)
-        raise ValueError("Синтаксическая проверка главного файла не пройдена:\\n" + details)
+        details = "\n".join(f"Строка {line}: {title}: {message}" for line, _col, title, message in syntax_issues)
+        raise ValueError("Синтаксическая проверка главного файла не пройдена:\n" + details)
 
     record = {
         "format": "skyrealm-studio-mod",
@@ -75,9 +75,9 @@ def publish_project(folder):
     target = destination / filename
     fd, temporary = tempfile.mkstemp(prefix=".mod-publish-", suffix=".tmp", dir=str(destination))
     try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\\n") as stream:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
             json.dump(record, stream, ensure_ascii=False, separators=(",", ":"))
-            stream.write("\\n")
+            stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, target)

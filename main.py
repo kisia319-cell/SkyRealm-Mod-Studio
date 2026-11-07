@@ -799,6 +799,7 @@ class ProjectWindow(QMainWindow):
             QMessageBox.information(self, "Проверка уже выполняется", "Дождись завершения текущей проверки проекта.")
             return
         self._publish_check_running = True
+        self.setEnabled(False)
         self.status.setText("Проверка перед публикацией выполняется в фоне…")
         task = _ProjectCheckTask(self.folder, EXTENSION_LANGUAGES)
         task.signals.project_finished.connect(self._apply_publish_check)
@@ -806,6 +807,7 @@ class ProjectWindow(QMainWindow):
 
     def _apply_publish_check(self, problems):
         self._publish_check_running = False
+        self.setEnabled(True)
         errors = [value for value in problems if not value.startswith("WARNING: ")]
         warnings = [value[len("WARNING: "):] for value in problems if value.startswith("WARNING: ")]
         if errors:

@@ -12,7 +12,7 @@ Windows desktop editor for SkyRealm mod projects.
 - Learning course, limited SkyRealm API catalog and educational starter templates.
 - GitHub Releases update check and portable EXE update flow with SHA-256 verification when the release asset exposes a digest.
 
-## Advanced tools (1.8.0)
+## Advanced tools (1.9.0)
 
 Open **Все инструменты** in a project to access:
 
